@@ -183,8 +183,8 @@ async function enrichVisualCorrelationsWithImages(
 
 async function fetchTavily(brand: string, apiKey: string): Promise<SourceItem[]> {
   const queries = [
-    `${brand} fashion brand aesthetics`,
-    `${brand} competitors quiet luxury minimalist streetwear`,
+    `${brand} brand overview products services positioning`,
+    `${brand} customer sentiment competitors alternatives market perception`,
   ];
 
   const responses = await Promise.all(
@@ -220,8 +220,8 @@ async function fetchTavily(brand: string, apiKey: string): Promise<SourceItem[]>
 
 async function fetchExa(brand: string, apiKey: string): Promise<SourceItem[]> {
   const queries = [
-    `${brand} brand perception fashion AI recommendations`,
-    `${brand} style descriptors minimalist parisian quiet luxury`,
+    `${brand} user discussions reviews and intent signals`,
+    `${brand} pricing trust quality support innovation perception`,
   ];
 
   const responses = await Promise.all(
@@ -275,7 +275,7 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
     : [
         {
           id: "ev-01",
-          query: `${normalizedBrand} semantic fashion landscape`,
+          query: `${normalizedBrand} semantic brand landscape`,
           aiResponse:
             "Baseline analysis generated due to sparse external results. Configure data connectors for richer evidence density.",
           sourceTitle: "Fallback synthesis",
@@ -304,8 +304,8 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
       fixed: true,
     },
     {
-      id: "minimalist",
-      label: "Minimalist",
+      id: "value-proposition",
+      label: "Value proposition",
       category: "aesthetic",
       x: 420,
       y: 260,
@@ -316,8 +316,8 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
       anchorY: 250,
     },
     {
-      id: "parisian",
-      label: "Parisian",
+      id: "audience-intent",
+      label: "Audience intent",
       category: "aesthetic",
       x: 600,
       y: 220,
@@ -328,8 +328,8 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
       anchorY: 220,
     },
     {
-      id: "quiet-luxury",
-      label: "Quiet luxury",
+      id: "trust-quality",
+      label: "Trust & quality",
       category: "aesthetic",
       x: 800,
       y: 450,
@@ -340,8 +340,8 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
       anchorY: 470,
     },
     {
-      id: "streetwear",
-      label: "Streetwear",
+      id: "pricing-positioning",
+      label: "Pricing positioning",
       category: "aesthetic",
       x: 810,
       y: 300,
@@ -353,7 +353,7 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
     },
     {
       id: "gap-discovery",
-      label: "Gap: discovery edge",
+      label: "Gap: discoverability",
       category: "gap",
       x: 920,
       y: 330,
@@ -368,40 +368,40 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
 
   const links: GraphLink[] = [
     {
-      id: "l-brand-minimalist",
+      id: "l-brand-value",
       source: "brand-core",
-      target: "minimalist",
+      target: "value-proposition",
       weight: 0.78,
       evidenceIds: [first],
     },
     {
-      id: "l-brand-parisian",
+      id: "l-brand-audience",
       source: "brand-core",
-      target: "parisian",
+      target: "audience-intent",
       weight: 0.7,
       evidenceIds: [second],
     },
     {
-      id: "l-brand-quiet",
+      id: "l-brand-trust",
       source: "brand-core",
-      target: "quiet-luxury",
+      target: "trust-quality",
       weight: 0.45,
       evidenceIds: [third],
       missing: true,
-      dominantCompetitor: "Established luxury houses",
+      dominantCompetitor: "Established competitors",
     },
     {
-      id: "l-brand-streetwear",
+      id: "l-brand-pricing",
       source: "brand-core",
-      target: "streetwear",
+      target: "pricing-positioning",
       weight: 0.35,
       evidenceIds: [third],
       missing: true,
-      dominantCompetitor: "Streetwear incumbents",
+      dominantCompetitor: "Category incumbents",
     },
     {
-      id: "l-streetwear-gap",
-      source: "streetwear",
+      id: "l-pricing-gap",
+      source: "pricing-positioning",
       target: "gap-discovery",
       weight: 0.24,
       evidenceIds: [third],
@@ -412,9 +412,9 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
   const semanticDiscourse: SemanticDiscourseItem[] = [
     {
       id: "sd-01",
-      phraseTemplate: `Users describe ${normalizedBrand} as polished minimalism with practical tailoring.`,
-      aesthetic: "minimalist",
-      intent: "style positioning",
+      phraseTemplate: `Users describe ${normalizedBrand} through clear value and use-case language, with strongest mentions around outcomes and reliability.`,
+      aesthetic: "value proposition",
+      intent: "brand positioning",
       observedAt: now,
       modelFamily: "OpenAI synthesis",
       sentiment: "positive",
@@ -422,8 +422,8 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
     },
     {
       id: "sd-02",
-      phraseTemplate: `When users ask broad luxury prompts, ${normalizedBrand} appears less frequently than top incumbents.`,
-      aesthetic: "quiet luxury",
+      phraseTemplate: `In broad category prompts, ${normalizedBrand} appears less frequently than larger incumbents, indicating a discoverability gap.`,
+      aesthetic: "competitive visibility",
       intent: "competitive visibility",
       observedAt: now,
       modelFamily: "OpenAI synthesis",
@@ -435,9 +435,9 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
   const visualCorrelations: VisualCorrelationItem[] = [
     {
       id: "vc-01",
-      title: "Tailored minimal palette",
-      imageCue: "Structured neutrals, matte textures, clean silhouettes",
-      visualTags: ["stone", "graphite", "architecture"],
+      title: "Core brand moodboard",
+      imageCue: "Visual motifs reflecting product quality, trust signals, and brand personality.",
+      visualTags: ["clarity", "consistency", "quality cues"],
       correlationScore: 0.8,
       observedWindow: `Observed on ${now}`,
       gradient: "linear-gradient(140deg, #d4d4d8 0%, #a1a1aa 45%, #3f3f46 100%)",
@@ -446,9 +446,9 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
     },
     {
       id: "vc-02",
-      title: "Streetwear discovery gap",
-      imageCue: "High contrast visuals map to competitors in broad prompts",
-      visualTags: ["contrast", "oversized", "youthful edge"],
+      title: "Discoverability gap moodboard",
+      imageCue: "Visual proxy for competitor-dominated category narratives and weak brand association.",
+      visualTags: ["competitor pressure", "generic intent", "awareness gap"],
       correlationScore: 0.32,
       observedWindow: `Observed on ${now}`,
       gradient: "linear-gradient(140deg, #0f172a 0%, #1e293b 45%, #be123c 100%)",
