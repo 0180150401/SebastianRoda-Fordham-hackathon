@@ -591,7 +591,7 @@ function normalizeModelPayload(
 
   const nodeRaw = Array.isArray(payload.nodes) ? payload.nodes : [];
   const nodes = nodeRaw
-    .map((item, index) => {
+    .map<GraphNode | null>((item, index) => {
       if (!item || typeof item !== "object") return null;
       const row = item as Record<string, unknown>;
       const label =
@@ -630,7 +630,7 @@ function normalizeModelPayload(
         gapHint: typeof row.gapHint === "string" ? row.gapHint : undefined,
       } satisfies GraphNode;
     })
-    .filter((item): item is GraphNode => Boolean(item));
+    .filter((item): item is GraphNode => item !== null);
 
   const hasBrandCore = nodes.some((node) => node.id === "brand-core");
   if (!hasBrandCore) {
@@ -661,7 +661,7 @@ function normalizeModelPayload(
   const nodeIdSet = new Set(nodes.map((node) => node.id));
   const linksRaw = Array.isArray(payload.links) ? payload.links : [];
   const links = linksRaw
-    .map((item, index) => {
+    .map<GraphLink | null>((item, index) => {
       if (!item || typeof item !== "object") return null;
       const row = item as Record<string, unknown>;
       const sourceRaw = row.source;
@@ -719,11 +719,11 @@ function normalizeModelPayload(
               : weight < 0.4,
       } satisfies GraphLink;
     })
-    .filter((item): item is GraphLink => Boolean(item));
+    .filter((item): item is GraphLink => item !== null);
 
   const discourseRaw = Array.isArray(payload.semanticDiscourse) ? payload.semanticDiscourse : [];
   const semanticDiscourse = discourseRaw
-    .map((item, index) => {
+    .map<SemanticDiscourseItem | null>((item, index) => {
       if (!item || typeof item !== "object") return null;
       const row = item as Record<string, unknown>;
       const phrase =
@@ -761,11 +761,11 @@ function normalizeModelPayload(
         evidenceIds: evidenceIds.length ? evidenceIds : [firstEvidenceId],
       } satisfies SemanticDiscourseItem;
     })
-    .filter((item): item is SemanticDiscourseItem => Boolean(item));
+    .filter((item): item is SemanticDiscourseItem => item !== null);
 
   const visualsRaw = Array.isArray(payload.visualCorrelations) ? payload.visualCorrelations : [];
   const visualCorrelations = visualsRaw
-    .map((item, index) => {
+    .map<VisualCorrelationItem | null>((item, index) => {
       if (!item || typeof item !== "object") return null;
       const row = item as Record<string, unknown>;
       const evidenceIdsRaw = Array.isArray(row.evidenceIds) ? row.evidenceIds : [];
@@ -818,7 +818,7 @@ function normalizeModelPayload(
             : !(typeof row.imageUrl === "string" || typeof row.image === "string"),
       } satisfies VisualCorrelationItem;
     })
-    .filter((item): item is VisualCorrelationItem => Boolean(item));
+    .filter((item): item is VisualCorrelationItem => item !== null);
 
   if (nodes.length < 3 || links.length < 2) {
     return null;
