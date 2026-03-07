@@ -58,8 +58,24 @@ type VisualCorrelationItem = {
   gradient: string;
   evidenceIds: string[];
   imageUrl?: string;
+  imageUrls?: string[];
   imageSource?: string;
   moodboardMode?: boolean;
+};
+
+type ModelStrengthModel = {
+  model: string;
+  avg: number;
+  count: number;
+  status: "strong" | "emerging" | "weak";
+  evidenceIds: string[];
+};
+
+type ModelStrengthPayload = {
+  score: number;
+  strong: number;
+  observed: number;
+  models: ModelStrengthModel[];
 };
 
 type SourceItem = {
@@ -77,11 +93,36 @@ type SemanticUniversePayload = {
   evidence: Evidence[];
   semanticDiscourse: SemanticDiscourseItem[];
   visualCorrelations: VisualCorrelationItem[];
+  modelStrength: ModelStrengthPayload;
 };
+
+const TRACKED_MODELS = [
+  "OpenAI",
+  "Claude",
+  "Gemini",
+  "Perplexity",
+  "Copilot",
+  "Google AI Overview",
+] as const;
 
 function cleanEnvValue(value: string | undefined): string | undefined {
   if (!value) return undefined;
   return value.replace(/^['"]|['"]$/g, "").trim();
+}
+
+function sanitizeEvidenceUrl(url: unknown): string {
+  if (typeof url !== "string") return "";
+  const trimmed = url.trim();
+  if (!trimmed) return "";
+  try {
+    const parsed = new URL(trimmed);
+    if (!["http:", "https:"].includes(parsed.protocol)) return "";
+    const host = parsed.hostname.toLowerCase();
+    if (host === "example.com" || host.endsWith(".example.com")) return "";
+    return parsed.toString();
+  } catch {
+    return "";
+  }
 }
 
 function dedupeByUrl(items: SourceItem[]): SourceItem[] {
@@ -114,9 +155,14 @@ function extractMetaImage(html: string): string | null {
   return null;
 }
 
-async function resolveSourceImage(pageUrl: string): Promise<string | null> {
-  if (!pageUrl || pageUrl.includes("example.com")) return null;
-  if (looksLikeImageUrl(pageUrl)) return pageUrl;
+function extractInlineImages(html: string): string[] {
+  const matches = [...html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)];
+  return matches.map((match) => match[1]).slice(0, 6);
+}
+
+async function resolveSourceImages(pageUrl: string): Promise<string[]> {
+  if (!pageUrl || pageUrl.includes("example.com")) return [];
+  if (looksLikeImageUrl(pageUrl)) return [pageUrl];
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 3500);
@@ -126,17 +172,26 @@ async function resolveSourceImage(pageUrl: string): Promise<string | null> {
       redirect: "follow",
       signal: controller.signal,
     });
-    if (!res.ok) return null;
+    if (!res.ok) return [];
     const html = await res.text();
-    const candidate = extractMetaImage(html);
-    if (!candidate) return null;
-    try {
-      return new URL(candidate, pageUrl).toString();
-    } catch {
-      return null;
-    }
+    const primary = extractMetaImage(html);
+    const inline = extractInlineImages(html);
+    const rawCandidates = [primary, ...inline].filter(
+      (candidate): candidate is string => Boolean(candidate),
+    );
+    const absoluteCandidates = rawCandidates
+      .map((candidate) => {
+        try {
+          return new URL(candidate, pageUrl).toString();
+        } catch {
+          return null;
+        }
+      })
+      .filter((candidate): candidate is string => Boolean(candidate))
+      .filter((candidate) => candidate.startsWith("http"));
+    return [...new Set(absoluteCandidates)].slice(0, 4);
   } catch {
-    return null;
+    return [];
   } finally {
     clearTimeout(timeout);
   }
@@ -155,23 +210,35 @@ async function enrichVisualCorrelationsWithImages(
     await Promise.all(
       candidateUrls.map(async (url) => ({
         sourceUrl: url,
-        imageUrl: await resolveSourceImage(url),
+        imageUrls: await resolveSourceImages(url),
       })),
     )
-  ).filter((item): item is { sourceUrl: string; imageUrl: string } => Boolean(item.imageUrl));
+  ).filter(
+    (item): item is { sourceUrl: string; imageUrls: string[] } => item.imageUrls.length > 0,
+  );
 
-  let imageIndex = 0;
+  const flattened = resolvedImages.flatMap((item) =>
+    item.imageUrls.map((imageUrl) => ({ sourceUrl: item.sourceUrl, imageUrl })),
+  );
+
+  let imageCursor = 0;
   const visualCorrelations = payload.visualCorrelations.map((item) => {
-    if (item.imageUrl && !item.imageUrl.includes("example.com")) {
-      return { ...item, moodboardMode: false };
+    const existingImages = Array.isArray(item.imageUrls)
+      ? item.imageUrls.filter((url) => typeof url === "string" && url.length > 0)
+      : item.imageUrl
+        ? [item.imageUrl]
+        : [];
+    if (existingImages.length > 0 && !existingImages[0].includes("example.com")) {
+      return { ...item, imageUrls: existingImages, imageUrl: existingImages[0], moodboardMode: false };
     }
-    const found = resolvedImages[imageIndex];
-    imageIndex += 1;
-    if (found) {
+    const picked = flattened.slice(imageCursor, imageCursor + 4);
+    imageCursor += 4;
+    if (picked.length > 0) {
       return {
         ...item,
-        imageUrl: found.imageUrl,
-        imageSource: found.sourceUrl,
+        imageUrl: picked[0].imageUrl,
+        imageUrls: picked.map((entry) => entry.imageUrl),
+        imageSource: picked[0].sourceUrl,
         moodboardMode: false,
       };
     }
@@ -183,8 +250,9 @@ async function enrichVisualCorrelationsWithImages(
 
 async function fetchTavily(brand: string, apiKey: string): Promise<SourceItem[]> {
   const queries = [
-    `${brand} brand overview products services positioning`,
-    `${brand} customer sentiment competitors alternatives market perception`,
+    `${brand} fashion brand aesthetics`,
+    `${brand} competitors quiet luxury minimalist streetwear`,
+    `${brand} campaign lookbook products`,
   ];
 
   const responses = await Promise.all(
@@ -197,7 +265,7 @@ async function fetchTavily(brand: string, apiKey: string): Promise<SourceItem[]>
           query,
           search_depth: "advanced",
           include_answer: false,
-          max_results: 5,
+          max_results: 7,
         }),
       });
       if (!res.ok) return [];
@@ -220,8 +288,9 @@ async function fetchTavily(brand: string, apiKey: string): Promise<SourceItem[]>
 
 async function fetchExa(brand: string, apiKey: string): Promise<SourceItem[]> {
   const queries = [
-    `${brand} user discussions reviews and intent signals`,
-    `${brand} pricing trust quality support innovation perception`,
+    `${brand} brand perception fashion AI recommendations`,
+    `${brand} style descriptors minimalist parisian quiet luxury`,
+    `${brand} product imagery lookbook fashion collection`,
   ];
 
   const responses = await Promise.all(
@@ -235,7 +304,7 @@ async function fetchExa(brand: string, apiKey: string): Promise<SourceItem[]> {
         body: JSON.stringify({
           query,
           type: "neural",
-          numResults: 5,
+          numResults: 7,
           useAutoprompt: true,
         }),
       });
@@ -265,7 +334,7 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
     query: source.query,
     aiResponse: source.snippet.slice(0, 260) || "No extracted snippet from source.",
     sourceTitle: source.title,
-    sourceUrl: source.url || "https://example.com",
+    sourceUrl: sanitizeEvidenceUrl(source.url),
     coOccurrence: Math.max(20, 72 - index * 4),
     timestamp: source.published?.slice(0, 10) || now,
   }));
@@ -275,11 +344,11 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
     : [
         {
           id: "ev-01",
-          query: `${normalizedBrand} semantic brand landscape`,
+          query: `${normalizedBrand} semantic fashion landscape`,
           aiResponse:
             "Baseline analysis generated due to sparse external results. Configure data connectors for richer evidence density.",
           sourceTitle: "Fallback synthesis",
-          sourceUrl: "https://example.com/fallback",
+          sourceUrl: "",
           coOccurrence: 35,
           timestamp: now,
         },
@@ -304,8 +373,8 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
       fixed: true,
     },
     {
-      id: "value-proposition",
-      label: "Value proposition",
+      id: "minimalist",
+      label: "Minimalist",
       category: "aesthetic",
       x: 420,
       y: 260,
@@ -316,8 +385,8 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
       anchorY: 250,
     },
     {
-      id: "audience-intent",
-      label: "Audience intent",
+      id: "parisian",
+      label: "Parisian",
       category: "aesthetic",
       x: 600,
       y: 220,
@@ -328,8 +397,8 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
       anchorY: 220,
     },
     {
-      id: "trust-quality",
-      label: "Trust & quality",
+      id: "quiet-luxury",
+      label: "Quiet luxury",
       category: "aesthetic",
       x: 800,
       y: 450,
@@ -340,8 +409,8 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
       anchorY: 470,
     },
     {
-      id: "pricing-positioning",
-      label: "Pricing positioning",
+      id: "streetwear",
+      label: "Streetwear",
       category: "aesthetic",
       x: 810,
       y: 300,
@@ -353,7 +422,7 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
     },
     {
       id: "gap-discovery",
-      label: "Gap: discoverability",
+      label: "discovery gap",
       category: "gap",
       x: 920,
       y: 330,
@@ -362,46 +431,46 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
       size: 12,
       anchorX: 920,
       anchorY: 330,
-      gapHint: "Low semantic share in generic prompts.",
+      gapHint: "Low brand share",
     },
   ];
 
   const links: GraphLink[] = [
     {
-      id: "l-brand-value",
+      id: "l-brand-minimalist",
       source: "brand-core",
-      target: "value-proposition",
+      target: "minimalist",
       weight: 0.78,
       evidenceIds: [first],
     },
     {
-      id: "l-brand-audience",
+      id: "l-brand-parisian",
       source: "brand-core",
-      target: "audience-intent",
+      target: "parisian",
       weight: 0.7,
       evidenceIds: [second],
     },
     {
-      id: "l-brand-trust",
+      id: "l-brand-quiet",
       source: "brand-core",
-      target: "trust-quality",
+      target: "quiet-luxury",
       weight: 0.45,
       evidenceIds: [third],
       missing: true,
-      dominantCompetitor: "Established competitors",
+      dominantCompetitor: "Established luxury houses",
     },
     {
-      id: "l-brand-pricing",
+      id: "l-brand-streetwear",
       source: "brand-core",
-      target: "pricing-positioning",
+      target: "streetwear",
       weight: 0.35,
       evidenceIds: [third],
       missing: true,
-      dominantCompetitor: "Category incumbents",
+      dominantCompetitor: "Streetwear incumbents",
     },
     {
-      id: "l-pricing-gap",
-      source: "pricing-positioning",
+      id: "l-streetwear-gap",
+      source: "streetwear",
       target: "gap-discovery",
       weight: 0.24,
       evidenceIds: [third],
@@ -412,9 +481,9 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
   const semanticDiscourse: SemanticDiscourseItem[] = [
     {
       id: "sd-01",
-      phraseTemplate: `Users describe ${normalizedBrand} through clear value and use-case language, with strongest mentions around outcomes and reliability.`,
-      aesthetic: "value proposition",
-      intent: "brand positioning",
+      phraseTemplate: `Users describe ${normalizedBrand} as polished minimalism with practical tailoring.`,
+      aesthetic: "minimalist",
+      intent: "style positioning",
       observedAt: now,
       modelFamily: "OpenAI synthesis",
       sentiment: "positive",
@@ -422,8 +491,8 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
     },
     {
       id: "sd-02",
-      phraseTemplate: `In broad category prompts, ${normalizedBrand} appears less frequently than larger incumbents, indicating a discoverability gap.`,
-      aesthetic: "competitive visibility",
+      phraseTemplate: `When users ask broad luxury prompts, ${normalizedBrand} appears less frequently than top incumbents.`,
+      aesthetic: "quiet luxury",
       intent: "competitive visibility",
       observedAt: now,
       modelFamily: "OpenAI synthesis",
@@ -435,9 +504,9 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
   const visualCorrelations: VisualCorrelationItem[] = [
     {
       id: "vc-01",
-      title: "Core brand moodboard",
-      imageCue: "Visual motifs reflecting product quality, trust signals, and brand personality.",
-      visualTags: ["clarity", "consistency", "quality cues"],
+      title: "Tailored minimal palette",
+      imageCue: "Structured neutrals, matte textures, clean silhouettes",
+      visualTags: ["stone", "graphite", "architecture"],
       correlationScore: 0.8,
       observedWindow: `Observed on ${now}`,
       gradient: "linear-gradient(140deg, #d4d4d8 0%, #a1a1aa 45%, #3f3f46 100%)",
@@ -446,9 +515,9 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
     },
     {
       id: "vc-02",
-      title: "Discoverability gap moodboard",
-      imageCue: "Visual proxy for competitor-dominated category narratives and weak brand association.",
-      visualTags: ["competitor pressure", "generic intent", "awareness gap"],
+      title: "Streetwear discovery gap",
+      imageCue: "High contrast visuals map to competitors in broad prompts",
+      visualTags: ["contrast", "oversized", "youthful edge"],
       correlationScore: 0.32,
       observedWindow: `Observed on ${now}`,
       gradient: "linear-gradient(140deg, #0f172a 0%, #1e293b 45%, #be123c 100%)",
@@ -457,7 +526,15 @@ function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePa
     },
   ];
 
-  return { nodes, links, evidence: safeEvidence, semanticDiscourse, visualCorrelations };
+  const modelStrength = buildModelStrengthPayload(safeEvidence, semanticDiscourse);
+  return {
+    nodes,
+    links,
+    evidence: safeEvidence,
+    semanticDiscourse,
+    visualCorrelations,
+    modelStrength,
+  };
 }
 
 function extractJsonObject(text: string): string {
@@ -502,6 +579,286 @@ function inferCategory(label: string, id: string, brand: string): NodeCategory {
   return "aesthetic";
 }
 
+function isPublisherLikeLabel(label: string): boolean {
+  const value = label.trim().toLowerCase();
+  if (!value) return false;
+  if (value.includes("http://") || value.includes("https://") || value.includes(".com")) {
+    return true;
+  }
+
+  const outletPatterns = [
+    "times",
+    "post",
+    "journal",
+    "gazette",
+    "herald",
+    "observer",
+    "financial times",
+    "business insider",
+    "forbes",
+    "bloomberg",
+    "reuters",
+    "associated press",
+    "news",
+    "magazine",
+    "newspaper",
+    "media",
+    "press",
+    "daily mail",
+    "the guardian",
+    "the telegraph",
+    "vogue business",
+    "wwd",
+  ];
+
+  const protectedIntentTerms = [
+    "streetwear",
+    "quiet luxury",
+    "minimalist",
+    "parisian",
+    "capsule",
+    "tailoring",
+    "style",
+    "fashion",
+    "aesthetic",
+    "brand identity",
+    "product",
+    "customer",
+    "intent",
+    "market",
+    "competition",
+    "gap",
+  ];
+
+  if (protectedIntentTerms.some((term) => value.includes(term))) {
+    return false;
+  }
+
+  return outletPatterns.some((term) => value.includes(term));
+}
+
+function normalizeBrandCandidate(value: string): string {
+  return value
+    .replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isLikelyBrandName(candidate: string, brand: string): boolean {
+  const value = candidate.toLowerCase();
+  if (!value) return false;
+  if (value === brand.toLowerCase()) return false;
+  if (value.length < 2 || value.length > 32) return false;
+
+  const bannedTokens = [
+    "market",
+    "cluster",
+    "intent",
+    "style",
+    "fashion",
+    "product",
+    "collection",
+    "article",
+    "report",
+    "analysis",
+    "news",
+    "magazine",
+    "press",
+    "media",
+    "times",
+    "journal",
+    "post",
+    "observer",
+    "forbes",
+    "reuters",
+    "pinterest",
+    "fashionunited",
+    "whowhatwear",
+    "mayfeyr",
+    "darveys",
+    "paper straight",
+  ];
+  if (bannedTokens.some((token) => value.includes(token))) return false;
+  return true;
+}
+
+function extractCompetitorNamesFromEvidence(brand: string, evidence: Evidence[]): string[] {
+  const knownCompetitors = [
+    "The Row",
+    "Loro Piana",
+    "Toteme",
+    "Khaite",
+    "Ami Paris",
+    "Sezane",
+    "A.P.C.",
+    "Maison Kitsune",
+    "Coperni",
+    "Acne Studios",
+    "Jil Sander",
+    "Nike",
+    "Reebok",
+    "Adidas",
+  ];
+  const corpusText = evidence.map((entry) => `${entry.query} ${entry.aiResponse}`).join(" ");
+  const corpusLower = corpusText.toLowerCase();
+
+  const knownMatches = knownCompetitors.filter(
+    (name) => corpusLower.includes(name.toLowerCase()) && name.toLowerCase() !== brand.toLowerCase(),
+  );
+
+  // Heuristic brand mining from article-derived evidence text.
+  const minedCounts = new Map<string, number>();
+  const matches = corpusText.matchAll(/\b([A-Z][A-Za-z0-9&.'-]+(?:\s+[A-Z][A-Za-z0-9&.'-]+){0,2})\b/g);
+  for (const match of matches) {
+    const normalized = normalizeBrandCandidate(match[1] ?? "");
+    if (!isLikelyBrandName(normalized, brand)) continue;
+    minedCounts.set(normalized, (minedCounts.get(normalized) ?? 0) + 1);
+  }
+  const minedBrands = Array.from(minedCounts.entries())
+    .filter(([, count]) => count >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .map(([name]) => name);
+
+  const combined = [...new Set([...knownMatches, ...minedBrands])];
+  return combined.filter((name) => !isPublisherLikeLabel(name)).slice(0, 8);
+}
+
+function uniqueNodeId(base: string, existing: Set<string>): string {
+  if (!existing.has(base)) return base;
+  let counter = 2;
+  while (existing.has(`${base}-${counter}`)) {
+    counter += 1;
+  }
+  return `${base}-${counter}`;
+}
+
+function isGenericIntentLabel(label: string): boolean {
+  const value = label.trim().toLowerCase();
+  if (!value) return true;
+  const genericTerms = [
+    "competition",
+    "competitor",
+    "cluster",
+    "intent",
+    "market",
+    "gap",
+    "uncaptured intent",
+    "priority intent",
+  ];
+  return genericTerms.some((term) => value === term || value.includes(`${term} `));
+}
+
+function pickEvidenceIdsForCompetitor(
+  competitorName: string,
+  evidence: Evidence[],
+  fallbackIds: string[],
+): string[] {
+  const name = competitorName.toLowerCase();
+  const matched = evidence
+    .filter((entry) => `${entry.query} ${entry.aiResponse}`.toLowerCase().includes(name))
+    .sort((a, b) => b.coOccurrence - a.coOccurrence)
+    .slice(0, 3)
+    .map((entry) => entry.id);
+  if (matched.length > 0) return matched;
+  return fallbackIds.slice(0, 2);
+}
+
+function inferModelsFromText(text: string): string[] {
+  const value = text.toLowerCase();
+  const models: string[] = [];
+  if (value.includes("openai") || value.includes("gpt")) models.push("OpenAI");
+  if (value.includes("claude") || value.includes("anthropic")) models.push("Claude");
+  if (value.includes("gemini")) models.push("Gemini");
+  if (value.includes("perplexity")) models.push("Perplexity");
+  if (value.includes("copilot") || value.includes("bing")) models.push("Copilot");
+  if (value.includes("google ai overview") || value.includes("ai overview")) {
+    models.push("Google AI Overview");
+  }
+  if (value.includes("cross-model") || value.includes("mixed models")) {
+    models.push("OpenAI", "Claude", "Gemini");
+  }
+  return [...new Set(models)];
+}
+
+function inferModelsFromEvidence(entry: Evidence): {
+  models: string[];
+  inferredFromProxy: boolean;
+} {
+  const explicit = inferModelsFromText(
+    `${entry.sourceTitle} ${entry.query} ${entry.aiResponse} ${entry.sourceUrl}`,
+  );
+  if (explicit.length > 0) {
+    return { models: explicit, inferredFromProxy: false };
+  }
+  return { models: ["OpenAI", "Claude", "Gemini"], inferredFromProxy: true };
+}
+
+function buildModelStrengthPayload(
+  evidence: Evidence[],
+  semanticDiscourse: SemanticDiscourseItem[],
+): ModelStrengthPayload {
+  const buckets = new Map<
+    string,
+    { total: number; count: number; evidenceIds: Set<string> }
+  >();
+  for (const model of TRACKED_MODELS) {
+    buckets.set(model, { total: 0, count: 0, evidenceIds: new Set<string>() });
+  }
+
+  for (const entry of evidence) {
+    const { models, inferredFromProxy } = inferModelsFromEvidence(entry);
+    for (const model of models) {
+      const bucket = buckets.get(model);
+      if (!bucket) continue;
+      bucket.total += inferredFromProxy ? entry.coOccurrence * 0.7 : entry.coOccurrence;
+      bucket.count += 1;
+      bucket.evidenceIds.add(entry.id);
+    }
+  }
+
+  for (const discourse of semanticDiscourse) {
+    const models = inferModelsFromText(discourse.modelFamily);
+    for (const model of models) {
+      const bucket = buckets.get(model);
+      if (!bucket) continue;
+      bucket.total += 45;
+      bucket.count += 1;
+      for (const evidenceId of discourse.evidenceIds) {
+        bucket.evidenceIds.add(evidenceId);
+      }
+    }
+  }
+
+  const observed = Array.from(buckets.entries())
+    .filter(([, bucket]) => bucket.count > 0)
+    .map(([model, bucket]) => {
+      const avg = bucket.total / bucket.count;
+      const status: "strong" | "emerging" | "weak" =
+        avg >= 55 ? "strong" : avg >= 40 ? "emerging" : "weak";
+      return {
+        model,
+        avg,
+        count: bucket.count,
+        status,
+        evidenceIds: Array.from(bucket.evidenceIds),
+      };
+    })
+    .sort((a, b) => b.avg - a.avg);
+
+  if (observed.length === 0) {
+    return { score: 0, strong: 0, observed: 0, models: [] };
+  }
+
+  const strong = observed.filter((model) => model.status === "strong").length;
+  const weightedTotal = observed.reduce((sum, model) => sum + model.avg * model.count, 0);
+  const weightedCount = observed.reduce((sum, model) => sum + model.count, 0);
+  const score =
+    weightedCount > 0
+      ? Math.max(0, Math.min(100, Math.round(weightedTotal / weightedCount)))
+      : 0;
+  return { score, strong, observed: observed.length, models: observed };
+}
+
 function normalizeModelPayload(
   raw: unknown,
   brand: string,
@@ -515,7 +872,7 @@ function normalizeModelPayload(
     query: source.query,
     aiResponse: source.snippet.slice(0, 280) || "No extracted snippet.",
     sourceTitle: source.title,
-    sourceUrl: source.url || "https://example.com",
+    sourceUrl: sanitizeEvidenceUrl(source.url),
     coOccurrence: Math.max(20, 68 - index * 3),
     timestamp: source.published?.slice(0, 10) || now,
   }));
@@ -541,10 +898,10 @@ function normalizeModelPayload(
             : "No summary available.";
       const sourceUrl =
         typeof row.sourceUrl === "string"
-          ? row.sourceUrl
+          ? sanitizeEvidenceUrl(row.sourceUrl)
           : typeof row.url === "string"
-            ? row.url
-            : "https://example.com";
+            ? sanitizeEvidenceUrl(row.url)
+            : "";
       const query =
         typeof row.query === "string"
           ? row.query
@@ -581,7 +938,7 @@ function normalizeModelPayload(
       query: `${brand} semantic landscape`,
       aiResponse: "Fallback evidence item due to missing sources.",
       sourceTitle: "Fallback",
-      sourceUrl: "https://example.com",
+      sourceUrl: "",
       coOccurrence: 35,
       timestamp: now,
     });
@@ -590,7 +947,7 @@ function normalizeModelPayload(
   const firstEvidenceId = safeEvidence[0].id;
 
   const nodeRaw = Array.isArray(payload.nodes) ? payload.nodes : [];
-  const nodes = nodeRaw
+  const rawNodes = nodeRaw
     .map<GraphNode | null>((item, index) => {
       if (!item || typeof item !== "object") return null;
       const row = item as Record<string, unknown>;
@@ -631,6 +988,7 @@ function normalizeModelPayload(
       } satisfies GraphNode;
     })
     .filter((item): item is GraphNode => item !== null);
+  let nodes = rawNodes.filter((node) => node.id === "brand-core" || !isPublisherLikeLabel(node.label));
 
   const hasBrandCore = nodes.some((node) => node.id === "brand-core");
   if (!hasBrandCore) {
@@ -658,9 +1016,9 @@ function normalizeModelPayload(
     }
   }
 
-  const nodeIdSet = new Set(nodes.map((node) => node.id));
+  let nodeIdSet = new Set(nodes.map((node) => node.id));
   const linksRaw = Array.isArray(payload.links) ? payload.links : [];
-  const links = linksRaw
+  let links = linksRaw
     .map<GraphLink | null>((item, index) => {
       if (!item || typeof item !== "object") return null;
       const row = item as Record<string, unknown>;
@@ -695,7 +1053,7 @@ function normalizeModelPayload(
           : [];
       const evidenceIds = evidenceIdsRaw
         .filter((id): id is string => typeof id === "string")
-        .map((id) => (evidenceIdSet.has(id) ? id : firstEvidenceId));
+        .filter((id) => evidenceIdSet.has(id));
       return {
         id:
           typeof row.id === "string" && row.id.trim().length
@@ -704,7 +1062,7 @@ function normalizeModelPayload(
         source,
         target,
         weight,
-        evidenceIds: evidenceIds.length ? evidenceIds : [firstEvidenceId],
+        evidenceIds,
         dominantCompetitor:
           typeof row.dominantCompetitor === "string"
             ? row.dominantCompetitor
@@ -720,6 +1078,39 @@ function normalizeModelPayload(
       } satisfies GraphLink;
     })
     .filter((item): item is GraphLink => item !== null);
+
+  const extractedCompetitors = extractCompetitorNamesFromEvidence(brand, safeEvidence);
+  const allowedCompetitorSet = new Set(extractedCompetitors.map((name) => name.toLowerCase()));
+
+  if (allowedCompetitorSet.size > 0) {
+    for (const node of nodes) {
+      if (node.category !== "competitor") continue;
+      const nodeLabel = node.label.trim().toLowerCase();
+      if (!allowedCompetitorSet.has(nodeLabel)) {
+        node.category = "aesthetic";
+      }
+    }
+    for (const link of links) {
+      if (!link.dominantCompetitor) continue;
+      if (!allowedCompetitorSet.has(link.dominantCompetitor.trim().toLowerCase())) {
+        link.dominantCompetitor = undefined;
+      }
+    }
+  }
+
+  // Safety pass: if any publisher-like labels slipped in, prune nodes and attached links.
+  const blockedNodeIds = new Set(
+    nodes
+      .filter((node) => node.id !== "brand-core" && isPublisherLikeLabel(node.label))
+      .map((node) => node.id),
+  );
+  if (blockedNodeIds.size > 0) {
+    nodes = nodes.filter((node) => !blockedNodeIds.has(node.id));
+    links = links.filter(
+      (link) => !blockedNodeIds.has(link.source) && !blockedNodeIds.has(link.target),
+    );
+    nodeIdSet = new Set(nodes.map((node) => node.id));
+  }
 
   const discourseRaw = Array.isArray(payload.semanticDiscourse) ? payload.semanticDiscourse : [];
   const semanticDiscourse = discourseRaw
@@ -737,7 +1128,7 @@ function normalizeModelPayload(
       const evidenceIdsRaw = Array.isArray(row.evidenceIds) ? row.evidenceIds : [];
       const evidenceIds = evidenceIdsRaw
         .filter((id): id is string => typeof id === "string")
-        .map((id) => (evidenceIdSet.has(id) ? id : firstEvidenceId));
+        .filter((id) => evidenceIdSet.has(id));
       return {
         id:
           typeof row.id === "string" && row.id.trim().length
@@ -758,7 +1149,7 @@ function normalizeModelPayload(
           row.sentiment === "positive" || row.sentiment === "neutral" || row.sentiment === "mixed"
             ? row.sentiment
             : "neutral",
-        evidenceIds: evidenceIds.length ? evidenceIds : [firstEvidenceId],
+        evidenceIds,
       } satisfies SemanticDiscourseItem;
     })
     .filter((item): item is SemanticDiscourseItem => item !== null);
@@ -771,7 +1162,7 @@ function normalizeModelPayload(
       const evidenceIdsRaw = Array.isArray(row.evidenceIds) ? row.evidenceIds : [];
       const evidenceIds = evidenceIdsRaw
         .filter((id): id is string => typeof id === "string")
-        .map((id) => (evidenceIdSet.has(id) ? id : firstEvidenceId));
+        .filter((id) => evidenceIdSet.has(id));
       return {
         id:
           typeof row.id === "string" && row.id.trim().length
@@ -781,7 +1172,7 @@ function normalizeModelPayload(
         imageCue:
           typeof row.imageCue === "string"
             ? row.imageCue
-            : "Visual language inferred from semantic prompts.",
+            : "Inferred from semantic phrasing: likely neutral/minimal palette, clean tailoring, understated textures, and styling cues aligned to the dominant intent cluster.",
         visualTags: Array.isArray(row.visualTags)
           ? row.visualTags.filter((tag): tag is string => typeof tag === "string")
           : [],
@@ -799,18 +1190,25 @@ function normalizeModelPayload(
             : typeof row.cssGradient === "string"
               ? row.cssGradient
               : "linear-gradient(140deg, #d4d4d8 0%, #a1a1aa 45%, #3f3f46 100%)",
-        evidenceIds: evidenceIds.length ? evidenceIds : [firstEvidenceId],
+        evidenceIds,
         imageUrl:
           typeof row.imageUrl === "string"
             ? row.imageUrl
             : typeof row.image === "string"
               ? row.image
               : undefined,
+        imageUrls: Array.isArray(row.imageUrls)
+          ? row.imageUrls.filter((url): url is string => typeof url === "string")
+          : typeof row.imageUrl === "string"
+            ? [row.imageUrl]
+            : typeof row.image === "string"
+              ? [row.image]
+              : undefined,
         imageSource:
           typeof row.imageSource === "string"
             ? row.imageSource
             : typeof row.sourceUrl === "string"
-              ? row.sourceUrl
+              ? sanitizeEvidenceUrl(row.sourceUrl)
               : undefined,
         moodboardMode:
           typeof row.moodboardMode === "boolean"
@@ -820,45 +1218,185 @@ function normalizeModelPayload(
     })
     .filter((item): item is VisualCorrelationItem => item !== null);
 
+  const hasUncapturedIntent = links.some(
+    (link) => Boolean(link.missing) || link.weight < 0.35 || link.evidenceIds.length === 0,
+  );
+  if (!hasUncapturedIntent) {
+    const nodeIds = new Set(nodes.map((node) => node.id));
+    const competitorNodes = nodes.filter(
+      (node) => node.category === "competitor" && !isPublisherLikeLabel(node.label),
+    );
+
+    const specificCompetitors: Array<{ id: string; label: string }> = [];
+
+    for (const competitor of competitorNodes.slice(0, 2)) {
+      specificCompetitors.push({ id: competitor.id, label: competitor.label });
+    }
+
+    for (const competitorName of extractedCompetitors) {
+      if (specificCompetitors.some((competitor) => competitor.label === competitorName)) {
+        continue;
+      }
+      const competitorId = uniqueNodeId(`competitor-${toSlug(competitorName)}`, nodeIds);
+      nodeIds.add(competitorId);
+      nodes.push({
+        id: competitorId,
+        label: competitorName,
+        category: "competitor",
+        x: 940,
+        y: 590 + specificCompetitors.length * 70,
+        vx: 0,
+        vy: 0,
+        size: 13,
+        anchorX: 930,
+        anchorY: 580 + specificCompetitors.length * 70,
+      });
+      specificCompetitors.push({ id: competitorId, label: competitorName });
+      if (specificCompetitors.length >= 2) break;
+    }
+
+    if (specificCompetitors.length === 0) {
+      const fallbackName = "The Row";
+      const fallbackId = uniqueNodeId(`competitor-${toSlug(fallbackName)}`, nodeIds);
+      nodeIds.add(fallbackId);
+      nodes.push({
+        id: fallbackId,
+        label: fallbackName,
+        category: "competitor",
+        x: 940,
+        y: 590,
+        vx: 0,
+        vy: 0,
+        size: 13,
+        anchorX: 930,
+        anchorY: 580,
+      });
+      specificCompetitors.push({ id: fallbackId, label: fallbackName });
+    }
+
+    const weakestBrandLink = links
+      .filter((link) => link.source === "brand-core" || link.target === "brand-core")
+      .sort((a, b) => a.weight - b.weight)[0];
+    const weakestTargetId =
+      weakestBrandLink?.source === "brand-core"
+        ? weakestBrandLink.target
+        : weakestBrandLink?.target === "brand-core"
+          ? weakestBrandLink.source
+          : nodes.find((node) => node.id !== "brand-core" && node.category !== "competitor")?.id ??
+            "brand-core";
+    const weakestTargetLabel = nodes.find((node) => node.id === weakestTargetId)?.label ?? "priority intent";
+    const fallbackIntentLabel = links
+      .filter((link) => link.source === "brand-core" || link.target === "brand-core")
+      .map((link) => (link.source === "brand-core" ? link.target : link.source))
+      .map((nodeId) => nodes.find((node) => node.id === nodeId)?.label ?? "")
+      .find((label) => !isGenericIntentLabel(label));
+    const normalizedWeakestIntentLabel =
+      !isGenericIntentLabel(weakestTargetLabel) && weakestTargetLabel
+        ? weakestTargetLabel
+        : fallbackIntentLabel || "quiet luxury search intent";
+
+    const gapNodeId = uniqueNodeId("gap-uncaptured-intent", nodeIds);
+    nodes.push({
+      id: gapNodeId,
+      label: `${normalizedWeakestIntentLabel} gap`,
+      category: "gap",
+      x: 835,
+      y: 620,
+      vx: 0,
+      vy: 0,
+      size: 12,
+      anchorX: 830,
+      anchorY: 620,
+      gapHint: `${specificCompetitors.map((competitor) => competitor.label).join(" & ")}`,
+    });
+
+    links.push({
+      id: `l-brand-core-${gapNodeId}`,
+      source: "brand-core",
+      target: gapNodeId,
+      weight: 0.22,
+      evidenceIds: weakestBrandLink?.evidenceIds ?? safeEvidence.slice(0, 1).map((entry) => entry.id),
+      missing: true,
+      dominantCompetitor: specificCompetitors[0]?.label,
+    });
+
+    for (const competitor of specificCompetitors.slice(0, 2)) {
+      const competitorEvidenceIds = pickEvidenceIdsForCompetitor(
+        competitor.label,
+        safeEvidence,
+        weakestBrandLink?.evidenceIds ?? safeEvidence.slice(0, 2).map((entry) => entry.id),
+      );
+      links.push({
+        id: `l-${gapNodeId}-${competitor.id}`,
+        source: gapNodeId,
+        target: competitor.id,
+        weight: 0.82,
+        evidenceIds: competitorEvidenceIds,
+        dominantCompetitor: competitor.label,
+      });
+    }
+  }
+
+  for (const link of links) {
+    if (!link.dominantCompetitor) continue;
+    if (link.evidenceIds.length > 0) continue;
+    link.evidenceIds = pickEvidenceIdsForCompetitor(
+      link.dominantCompetitor,
+      safeEvidence,
+      safeEvidence.slice(0, 2).map((entry) => entry.id),
+    );
+  }
+
   if (nodes.length < 3 || links.length < 2) {
     return null;
   }
+
+  const resolvedSemanticDiscourse: SemanticDiscourseItem[] =
+    semanticDiscourse.length > 0
+      ? semanticDiscourse
+      : [
+          {
+            id: "sd-1",
+            phraseTemplate: `Users discuss ${brand} through clustered aesthetic language.`,
+            aesthetic: "mixed",
+            intent: "semantic overview",
+            observedAt: now,
+            modelFamily: "Cross-model sample",
+            sentiment: "neutral",
+            evidenceIds: [firstEvidenceId],
+          },
+        ];
+
+  const resolvedVisualCorrelations: VisualCorrelationItem[] =
+    visualCorrelations.length > 0
+      ? visualCorrelations
+      : [
+          {
+            id: "vc-1",
+            title: "Primary visual language",
+            imageCue:
+              "Inferred from strongest semantic cluster: probable color direction, silhouette structure, material feel, and styling references users most frequently associate with the brand.",
+            visualTags: ["neutral palette", "clean lines"],
+            correlationScore: 0.5,
+            observedWindow: `Observed around ${now}`,
+            gradient: "linear-gradient(140deg, #d4d4d8 0%, #a1a1aa 45%, #3f3f46 100%)",
+            evidenceIds: [firstEvidenceId],
+            moodboardMode: true,
+          },
+        ];
+
+  const modelStrength = buildModelStrengthPayload(
+    safeEvidence,
+    resolvedSemanticDiscourse,
+  );
 
   return {
     nodes,
     links,
     evidence: safeEvidence,
-    semanticDiscourse:
-      semanticDiscourse.length > 0
-        ? semanticDiscourse
-        : [
-            {
-              id: "sd-1",
-              phraseTemplate: `Users discuss ${brand} through clustered aesthetic language.`,
-              aesthetic: "mixed",
-              intent: "semantic overview",
-              observedAt: now,
-              modelFamily: "Cross-model sample",
-              sentiment: "neutral",
-              evidenceIds: [firstEvidenceId],
-            },
-          ],
-    visualCorrelations:
-      visualCorrelations.length > 0
-        ? visualCorrelations
-        : [
-            {
-              id: "vc-1",
-              title: "Primary visual language",
-              imageCue: "Visual motif inferred from the strongest semantic cluster.",
-              visualTags: ["neutral palette", "clean lines"],
-              correlationScore: 0.5,
-              observedWindow: `Observed around ${now}`,
-              gradient: "linear-gradient(140deg, #d4d4d8 0%, #a1a1aa 45%, #3f3f46 100%)",
-              evidenceIds: [firstEvidenceId],
-              moodboardMode: true,
-            },
-          ],
+    semanticDiscourse: resolvedSemanticDiscourse,
+    visualCorrelations: resolvedVisualCorrelations,
+    modelStrength,
   };
 }
 
