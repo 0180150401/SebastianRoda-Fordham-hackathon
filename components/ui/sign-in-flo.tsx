@@ -228,29 +228,12 @@ function safeRedirectPath(raw: string | null): string {
 
 type OAuthProviderId = "google" | "github" | "linkedin_oidc";
 
-function googleCallbackUrlForDocs(): string | null {
-  const raw = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  if (!raw) return null;
-  try {
-    const withScheme = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-    const u = new URL(withScheme.replace(/\/+$/, ""));
-    return `https://${u.host}/auth/v1/callback`;
-  } catch {
-    return null;
-  }
-}
-
 export function SignInFlo() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [clientReady, setClientReady] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
-  const [browserOrigin, setBrowserOrigin] = useState<string | null>(null);
-
-  useEffect(() => {
-    setBrowserOrigin(window.location.origin);
-  }, []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -532,40 +515,6 @@ export function SignInFlo() {
                 />
               ))}
             </div>
-
-            <details className="mt-6 rounded-lg border border-border/80 bg-muted/30 px-3 py-2 text-left text-xs text-muted-foreground">
-              <summary className="cursor-pointer font-medium text-foreground/90">
-                See JSON error on *.supabase.co after Google?
-              </summary>
-              <ul className="mt-2 list-disc space-y-2 pl-4">
-                <li>
-                  <strong className="text-foreground/80">Supabase → Authentication → URL Configuration:</strong>{" "}
-                  <strong className="text-foreground">Site URL</strong> must be your real app origin (production:{" "}
-                  <code className="rounded bg-muted px-1 font-mono">https://6degree.noemtech.com</code>),{" "}
-                  <strong className="text-foreground">not</strong> the{" "}
-                  <code className="font-mono">.supabase.co</code> project URL from Settings → API. If Site URL is that API
-                  host, you can land on the project root and see{" "}
-                  <code className="font-mono">requested path is invalid</code>.
-                </li>
-                <li>
-                  <strong className="text-foreground/80">Redirect URLs</strong> must include your app callback, e.g.{" "}
-                  <code className="break-all rounded bg-muted px-1 font-mono">
-                    {browserOrigin ? `${browserOrigin}/auth/callback` : "https://YOUR_DOMAIN/auth/callback"}
-                  </code>
-                  .
-                </li>
-                {googleCallbackUrlForDocs() ? (
-                  <li>
-                    <strong className="text-foreground/80">Google Cloud Console → OAuth client → Authorized redirect URIs:</strong>{" "}
-                    include <strong className="text-foreground">only</strong> this full URL (not the bare{" "}
-                    <code className="font-mono">*.supabase.co</code> origin):{" "}
-                    <code className="mt-1 block break-all rounded bg-muted px-1 font-mono text-[11px]">
-                      {googleCallbackUrlForDocs()}
-                    </code>
-                  </li>
-                ) : null}
-              </ul>
-            </details>
           </div>
 
           <div className="mt-8 text-center">
