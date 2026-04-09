@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { supabaseCookieOptions } from "@/lib/supabase/cookie-options";
 import { getSupabasePublicConfig } from "@/lib/supabase/env";
+import { normalizeSiteOrigin } from "@/lib/site-url";
 
 function safeNextPath(raw: string | null): string {
   if (!raw) return "/tool";
@@ -13,8 +14,8 @@ function safeNextPath(raw: string | null): string {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const origin =
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    process.env.AUTH_URL ??
+    normalizeSiteOrigin(process.env.NEXT_PUBLIC_SITE_URL) ??
+    normalizeSiteOrigin(process.env.AUTH_URL) ??
     new URL(request.url).origin;
   const code = searchParams.get("code");
   const next = safeNextPath(searchParams.get("next"));

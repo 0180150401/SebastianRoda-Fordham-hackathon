@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { IconGithub, IconGoogle, IconLinkedIn } from "@/components/auth/oauth-icons";
 import { Eye, EyeOff, Mail, Lock, User } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { normalizeSiteOrigin } from "@/lib/site-url";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 interface FormFieldProps {
@@ -226,8 +227,8 @@ function safeRedirectPath(raw: string | null): string {
 }
 
 function getCallbackBaseUrl(): string {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  if (configured) return configured.replace(/\/$/, "");
+  const configured = normalizeSiteOrigin(process.env.NEXT_PUBLIC_SITE_URL);
+  if (configured) return configured;
   if (typeof window !== "undefined") return window.location.origin;
   return "https://6degree.noemtech.com";
 }

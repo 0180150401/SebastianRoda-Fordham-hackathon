@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { normalizeSiteOrigin } from "@/lib/site-url";
 import { stripe } from "@/lib/stripe";
 import { NextResponse } from "next/server";
 
@@ -31,7 +32,9 @@ export async function POST() {
   }
 
   const baseUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ?? process.env.AUTH_URL ?? "https://6degree.noemtech.com";
+    normalizeSiteOrigin(process.env.NEXT_PUBLIC_SITE_URL) ??
+    normalizeSiteOrigin(process.env.AUTH_URL) ??
+    "https://6degree.noemtech.com";
 
   const session = await stripe.billingPortal.sessions.create({
     customer: customerId,
