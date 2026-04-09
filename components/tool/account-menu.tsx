@@ -1,6 +1,6 @@
 "use client";
 
-import { CreditCard, Home, LogOut, Settings2, UserCircle } from "lucide-react";
+import { Home, LogOut, Settings2, UserCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -79,11 +79,6 @@ export function AccountMenu() {
         <MenuDropdownLinkItem href="/">
           <Home className="text-muted-foreground" />
           Home
-        </MenuDropdownLinkItem>
-
-        <MenuDropdownLinkItem href="/#trusted-by">
-          <CreditCard className="text-muted-foreground" />
-          Plans
         </MenuDropdownLinkItem>
 
         <MenuDropdownItem

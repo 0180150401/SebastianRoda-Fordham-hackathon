@@ -3,6 +3,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { canUseSemanticTool, isSubscriptionActive } from "@/lib/tool-access";
 import { NextResponse } from "next/server";
 
+function hasDemoCookie(request: Request): boolean {
+  const cookie = request.headers.get("cookie") ?? "";
+  return /(?:^|;\s*)semantic_demo_used=1(?:;|$)/.test(cookie);
+}
+
 async function markFreeDemoUsed(userId: string) {
   const iso = new Date().toISOString();
   if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -1592,8 +1597,9 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   const subscriptionActive = isSubscriptionActive(profile?.stripe_status);
-  const demoAlreadyUsed = Boolean(profile?.free_demo_used_at);
-  if (!canUseSemanticTool(subscriptionActive, profile?.free_demo_used_at)) {
+  const demoAlreadyUsed =
+    Boolean(profile?.free_demo_used_at) || hasDemoCookie(request);
+  if (!canUseSemanticTool(subscriptionActive, demoAlreadyUsed ? "1" : null)) {
     return NextResponse.json(
       { error: "Subscription required.", code: "PAYWALL" },
       { status: 402 },
@@ -1662,11 +1668,21 @@ export async function POST(request: Request) {
     },
   });
 
-  return new Response(stream, {
+  const response = new Response(stream, {
     headers: {
       "Content-Type": "application/x-ndjson",
       "Cache-Control": "no-cache, no-transform",
       "X-Content-Type-Options": "nosniff",
     },
   });
+
+  // Fallback guard: enforce one free run even when profile writes fail.
+  if (!subscriptionActive && !demoAlreadyUsed) {
+    response.headers.append(
+      "Set-Cookie",
+      "semantic_demo_used=1; Path=/; Max-Age=31536000; SameSite=Lax; HttpOnly",
+    );
+  }
+
+  return response;
 }

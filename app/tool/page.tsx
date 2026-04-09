@@ -17,6 +17,7 @@ const VIEW_WIDTH = 1180;
 const VIEW_HEIGHT = 760;
 const CENTER_X = VIEW_WIDTH / 2;
 const CENTER_Y = VIEW_HEIGHT / 2;
+const DEMO_STORAGE_KEY = "semantic_demo_used";
 
 type NodeCategory = "brand" | "aesthetic" | "query" | "competitor" | "gap";
 
@@ -101,6 +102,11 @@ type StreamEvent =
   | { type: "step"; id: StepId; status: "running" | "done" | "error"; detail?: string }
   | { type: "done"; payload: LoosePayload }
   | { type: "error"; message: string };
+
+type ToolAccessPayload = {
+  subscriptionActive: boolean;
+  hasFreeDemoRemaining: boolean;
+};
 
 type LoosePayload = Partial<{
   nodes: unknown;
@@ -896,6 +902,12 @@ function ToolPageInner() {
   }, [subscriptionActive]);
 
   useEffect(() => {
+    if (!subscriptionActive && !hasFreeDemoRemaining) {
+      setShowPaywall(true);
+    }
+  }, [hasFreeDemoRemaining, subscriptionActive]);
+
+  useEffect(() => {
     if (isLoading) setAgentTraceOpen(true);
   }, [isLoading]);
 
@@ -965,6 +977,31 @@ function ToolPageInner() {
   };
 
   const runSemanticAnalysis = async () => {
+    if (!subscriptionActive) {
+      // Always validate access on click so paywall pops reliably after demo use.
+      try {
+        const accessRes = await fetch("/api/tool/access", { credentials: "include" });
+        if (accessRes.ok) {
+          const latest = (await accessRes.json()) as ToolAccessPayload;
+          if (!latest.subscriptionActive && !latest.hasFreeDemoRemaining) {
+            setLoadError("Your free demo has been used. Subscribe to continue running analyses.");
+            setShowPaywall(true);
+            return;
+          }
+        } else if (!hasFreeDemoRemaining) {
+          setLoadError("Your free demo has been used. Subscribe to continue running analyses.");
+          setShowPaywall(true);
+          return;
+        }
+      } catch {
+        if (!hasFreeDemoRemaining) {
+          setLoadError("Your free demo has been used. Subscribe to continue running analyses.");
+          setShowPaywall(true);
+          return;
+        }
+      }
+    }
+
     const targetBrand = brandInput.trim();
     if (!targetBrand) return;
     setIsLoading(true);
@@ -1011,6 +1048,10 @@ function ToolPageInner() {
             } else if (event.type === "done") {
               const payload = normalizePayload(event.payload);
               applyUniversePayload(payload, targetBrand);
+              if (!subscriptionActive && typeof window !== "undefined") {
+                // Client fallback guard so demo usage is enforced even if profile writes lag/fail.
+                window.localStorage.setItem(DEMO_STORAGE_KEY, "1");
+              }
               setAgentTasks((prev) =>
                 prev.map((t) => ({
                   ...t,
@@ -1640,6 +1681,10 @@ function ToolPageInner() {
           </div>
         </div>
       </section>
+
+      {showPaywall ? (
+        <ToolPaywall variant="overlay" onDismiss={() => setShowPaywall(false)} />
+      ) : null}
 
     </div>
   );

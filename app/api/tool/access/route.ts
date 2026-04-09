@@ -2,7 +2,12 @@ import { createClient } from "@/lib/supabase/server";
 import { isSubscriptionActive } from "@/lib/tool-access";
 import { NextResponse } from "next/server";
 
-export async function GET() {
+function hasDemoCookie(request: Request): boolean {
+  const cookie = request.headers.get("cookie") ?? "";
+  return /(?:^|;\s*)semantic_demo_used=1(?:;|$)/.test(cookie);
+}
+
+export async function GET(request: Request) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -23,7 +28,7 @@ export async function GET() {
   }
 
   const subscriptionActive = isSubscriptionActive(profile?.stripe_status);
-  const demoUsed = Boolean(profile?.free_demo_used_at);
+  const demoUsed = Boolean(profile?.free_demo_used_at) || hasDemoCookie(request);
 
   return NextResponse.json({
     subscriptionActive,

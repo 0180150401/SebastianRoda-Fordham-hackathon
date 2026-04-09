@@ -17,20 +17,16 @@ const plans = [
     id: "solo",
     name: "Solo",
     description: "1 user",
-    monthlyPrice: 8.99,
-    yearlyPrice: 6.99,
-    features: [
-      "AI visibility tracking (5 keywords)",
-      "Competitor snapshot reports",
-      "Monthly strategy digest",
-    ],
+    monthlyPrice: 25.0,
+    yearlyPrice: 15.0,
+    features: [],
   },
   {
     id: "teams",
     name: "Teams",
     description: "up to 3 users",
-    monthlyPrice: 12.99,
-    yearlyPrice: 9.99,
+    monthlyPrice: 50.0,
+    yearlyPrice: 40.0,
     features: [],
   },
 ];
@@ -49,12 +45,14 @@ export default function PricingCard() {
   const [selectedPlan, setSelectedPlan] = useState("solo");
   const [userCount, setUserCount] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const router = useRouter();
   const isTeamsPlan = selectedPlan === "teams";
   const checkoutQuantity = isTeamsPlan ? Math.max(1, Math.min(3, userCount)) : 1;
 
   async function handleCheckout() {
     setLoading(true);
+    setCheckoutError(null);
     try {
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
@@ -68,7 +66,13 @@ export default function PricingCard() {
       const data = await res.json() as { url?: string; error?: string };
       if (data.url) {
         window.location.href = data.url;
+        return;
       }
+      setCheckoutError(data.error ?? "Unable to start checkout. Please try again.");
+    } catch (error) {
+      setCheckoutError(
+        error instanceof Error ? error.message : "Unable to start checkout. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -186,9 +190,12 @@ export default function PricingCard() {
                       format={{ style: "currency", currency: "USD" }}
                     />
                   </div>
-                  <div className="text-[0.65rem] text-muted-foreground/60">
-                    /{billingCycle === "monthly" ? "mo" : "yr"}
-                  </div>
+                  <div className="text-[0.65rem] text-muted-foreground/60">/mo</div>
+                  {billingCycle === "yearly" ? (
+                    <div className="text-[0.65rem] text-muted-foreground/60">
+                      billed annually
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -281,6 +288,9 @@ export default function PricingCard() {
       >
         {loading ? "Redirecting…" : "Get Started"}
       </button>
+      {checkoutError ? (
+        <p className="text-xs text-rose-500">{checkoutError}</p>
+      ) : null}
     </div>
   );
 }

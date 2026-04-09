@@ -16,6 +16,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "6 degree's | AI GEO Consultant",
   description: "6 degree's helps teams understand where their brand shows up in AI answers and search, where competitors win, and what to do next.",
+  icons: {
+    icon: "/6degree-tab-logo.png",
+    shortcut: "/6degree-tab-logo.png",
+    apple: "/6degree-tab-logo.png",
+  },
 };
 
 export default function RootLayout({
