@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing Stripe price configuration for this plan." }, { status: 500 });
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.AUTH_URL ?? "http://localhost:3000";
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.AUTH_URL ?? "https://6degree.noemtech.com";
     const normalizedQuantity =
       planId === "teams"
         ? Math.max(1, Math.min(3, quantity))

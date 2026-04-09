@@ -5,7 +5,11 @@ import { supabaseCookieOptions } from "@/lib/supabase/cookie-options";
 import { getSupabasePublicConfig } from "@/lib/supabase/env";
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
+  const origin =
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    process.env.AUTH_URL ??
+    new URL(request.url).origin;
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/tool";
 

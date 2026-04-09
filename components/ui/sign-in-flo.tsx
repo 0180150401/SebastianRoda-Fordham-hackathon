@@ -225,6 +225,13 @@ function safeRedirectPath(raw: string | null): string {
   return raw;
 }
 
+function getCallbackBaseUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (configured) return configured.replace(/\/$/, "");
+  if (typeof window !== "undefined") return window.location.origin;
+  return "https://6degree.noemtech.com";
+}
+
 type OAuthProviderId = "google" | "github" | "linkedin_oidc";
 
 export function SignInFlo() {
@@ -274,7 +281,7 @@ export function SignInFlo() {
           password,
           options: {
             data: { full_name: name.trim() },
-            emailRedirectTo: `${typeof window !== "undefined" ? window.location.origin : ""}/auth/callback?next=${encodeURIComponent(next)}`,
+            emailRedirectTo: `${getCallbackBaseUrl()}/auth/callback?next=${encodeURIComponent(next)}`,
           },
         });
         if (error) {
@@ -314,7 +321,7 @@ export function SignInFlo() {
     if (!supabase) return;
     setFormError(null);
     const next = safeRedirectPath(searchParams.get("redirect"));
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
+    const redirectTo = `${getCallbackBaseUrl()}/auth/callback?next=${encodeURIComponent(next)}`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: { redirectTo },
@@ -332,7 +339,7 @@ export function SignInFlo() {
       return;
     }
     const { error } = await supabase.auth.resetPasswordForEmail(addr, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/tool`,
+      redirectTo: `${getCallbackBaseUrl()}/auth/callback?next=/tool`,
     });
     if (error) setFormError(error.message);
     else setFormSuccess("If an account exists, we sent a password reset link.");

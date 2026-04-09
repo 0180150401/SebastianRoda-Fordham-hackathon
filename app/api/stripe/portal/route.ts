@@ -31,7 +31,7 @@ export async function POST() {
   }
 
   const baseUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ?? process.env.AUTH_URL ?? "http://localhost:3000";
+    process.env.NEXT_PUBLIC_SITE_URL ?? process.env.AUTH_URL ?? "https://6degree.noemtech.com";
 
   const session = await stripe.billingPortal.sessions.create({
     customer: customerId,
