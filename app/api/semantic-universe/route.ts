@@ -1,4 +1,23 @@
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { canUseSemanticTool, isSubscriptionActive } from "@/lib/tool-access";
 import { NextResponse } from "next/server";
+
+async function markFreeDemoUsed(userId: string) {
+  const iso = new Date().toISOString();
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    try {
+      const admin = createAdminClient();
+      await admin.from("profiles").update({ free_demo_used_at: iso }).eq("id", userId);
+      return;
+    } catch (e) {
+      console.error("[semantic-universe] mark demo (admin)", e);
+    }
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.from("profiles").update({ free_demo_used_at: iso }).eq("id", userId);
+  if (error) console.error("[semantic-universe] mark demo (user)", error);
+}
 
 type NodeCategory = "brand" | "aesthetic" | "query" | "competitor" | "gap";
 
@@ -250,9 +269,9 @@ async function enrichVisualCorrelationsWithImages(
 
 async function fetchTavily(brand: string, apiKey: string): Promise<SourceItem[]> {
   const queries = [
-    `${brand} fashion brand aesthetics`,
-    `${brand} competitors quiet luxury minimalist streetwear`,
-    `${brand} campaign lookbook products`,
+    `${brand} co-occurrence with competing brands in news`,
+    `${brand} versus alternatives in shared product categories news`,
+    `${brand} mention share across minimalist quiet luxury streetwear news`,
   ];
 
   const responses = await Promise.all(
@@ -288,9 +307,9 @@ async function fetchTavily(brand: string, apiKey: string): Promise<SourceItem[]>
 
 async function fetchExa(brand: string, apiKey: string): Promise<SourceItem[]> {
   const queries = [
-    `${brand} brand perception fashion AI recommendations`,
-    `${brand} style descriptors minimalist parisian quiet luxury`,
-    `${brand} product imagery lookbook fashion collection`,
+    `${brand} co-occurrence with rival brands across shared intents`,
+    `${brand} news where competitors dominate similar audiences`,
+    `${brand} category-level comparison where rivals outperform`,
   ];
 
   const responses = await Promise.all(
@@ -682,31 +701,12 @@ function isLikelyBrandName(candidate: string, brand: string): boolean {
   return true;
 }
 
-function extractCompetitorNamesFromEvidence(brand: string, evidence: Evidence[]): string[] {
-  const knownCompetitors = [
-    "The Row",
-    "Loro Piana",
-    "Toteme",
-    "Khaite",
-    "Ami Paris",
-    "Sezane",
-    "A.P.C.",
-    "Maison Kitsune",
-    "Coperni",
-    "Acne Studios",
-    "Jil Sander",
-    "Nike",
-    "Reebok",
-    "Adidas",
-  ];
-  const corpusText = evidence.map((entry) => `${entry.query} ${entry.aiResponse}`).join(" ");
-  const corpusLower = corpusText.toLowerCase();
+function extractCompetitorNamesFromSources(brand: string, sources: SourceItem[]): string[] {
+  // Mine from raw source snippets — richer text than post-processed evidence.
+  const corpusText = sources
+    .map((s) => `${s.query} ${s.title} ${s.snippet}`)
+    .join(" ");
 
-  const knownMatches = knownCompetitors.filter(
-    (name) => corpusLower.includes(name.toLowerCase()) && name.toLowerCase() !== brand.toLowerCase(),
-  );
-
-  // Heuristic brand mining from article-derived evidence text.
   const minedCounts = new Map<string, number>();
   const matches = corpusText.matchAll(/\b([A-Z][A-Za-z0-9&.'-]+(?:\s+[A-Z][A-Za-z0-9&.'-]+){0,2})\b/g);
   for (const match of matches) {
@@ -714,13 +714,32 @@ function extractCompetitorNamesFromEvidence(brand: string, evidence: Evidence[])
     if (!isLikelyBrandName(normalized, brand)) continue;
     minedCounts.set(normalized, (minedCounts.get(normalized) ?? 0) + 1);
   }
-  const minedBrands = Array.from(minedCounts.entries())
+
+  return Array.from(minedCounts.entries())
     .filter(([, count]) => count >= 2)
     .sort((a, b) => b[1] - a[1])
-    .map(([name]) => name);
+    .map(([name]) => name)
+    .filter((name) => !isPublisherLikeLabel(name))
+    .slice(0, 10);
+}
 
-  const combined = [...new Set([...knownMatches, ...minedBrands])];
-  return combined.filter((name) => !isPublisherLikeLabel(name)).slice(0, 8);
+function extractCompetitorNamesFromEvidence(brand: string, evidence: Evidence[]): string[] {
+  const corpusText = evidence.map((entry) => `${entry.query} ${entry.aiResponse}`).join(" ");
+
+  const minedCounts = new Map<string, number>();
+  const matches = corpusText.matchAll(/\b([A-Z][A-Za-z0-9&.'-]+(?:\s+[A-Z][A-Za-z0-9&.'-]+){0,2})\b/g);
+  for (const match of matches) {
+    const normalized = normalizeBrandCandidate(match[1] ?? "");
+    if (!isLikelyBrandName(normalized, brand)) continue;
+    minedCounts.set(normalized, (minedCounts.get(normalized) ?? 0) + 1);
+  }
+
+  return Array.from(minedCounts.entries())
+    .filter(([, count]) => count >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .map(([name]) => name)
+    .filter((name) => !isPublisherLikeLabel(name))
+    .slice(0, 8);
 }
 
 function uniqueNodeId(base: string, existing: Set<string>): string {
@@ -749,15 +768,41 @@ function isGenericIntentLabel(label: string): boolean {
 }
 
 function pickEvidenceIdsForCompetitor(
+  brand: string,
   competitorName: string,
   evidence: Evidence[],
   fallbackIds: string[],
 ): string[] {
+  const brandName = brand.toLowerCase();
   const name = competitorName.toLowerCase();
+
+  const scored = evidence
+    .map((entry) => {
+      const corpus = `${entry.query} ${entry.aiResponse} ${entry.sourceTitle}`.toLowerCase();
+      if (!corpus.includes(name)) return null;
+      const hasBrand = corpus.includes(brandName);
+      const hasSharedSpaceCue =
+        /co-occurr|shared|same|overlap|vs|versus|compared|alternative|category|intent|news|coverage|recommend/.test(
+          corpus,
+        );
+      const score =
+        entry.coOccurrence + (hasBrand ? 30 : 0) + (hasSharedSpaceCue ? 22 : 0);
+      return {
+        id: entry.id,
+        score,
+      };
+    })
+    .filter((item): item is { id: string; score: number } => item !== null)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map((item) => item.id);
+
+  if (scored.length > 0) return scored;
+
   const matched = evidence
     .filter((entry) => `${entry.query} ${entry.aiResponse}`.toLowerCase().includes(name))
     .sort((a, b) => b.coOccurrence - a.coOccurrence)
-    .slice(0, 3)
+    .slice(0, 2)
     .map((entry) => entry.id);
   if (matched.length > 0) return matched;
   return fallbackIds.slice(0, 2);
@@ -1144,7 +1189,13 @@ function normalizeModelPayload(
               ? row.observedDate.slice(0, 10)
               : now,
         modelFamily:
-          typeof row.modelFamily === "string" ? row.modelFamily : "Cross-model sample",
+          typeof row.modelFamily === "string"
+            ? row.modelFamily
+            : typeof row.model === "string"
+              ? row.model
+              : typeof row.engine === "string"
+                ? row.engine
+                : "ChatGPT",
         sentiment:
           row.sentiment === "positive" || row.sentiment === "neutral" || row.sentiment === "mixed"
             ? row.sentiment
@@ -1184,12 +1235,28 @@ function normalizeModelPayload(
           typeof row.observedWindow === "string"
             ? row.observedWindow
             : `Observed around ${now}`,
-        gradient:
-          typeof row.gradient === "string"
-            ? row.gradient
-            : typeof row.cssGradient === "string"
-              ? row.cssGradient
-              : "linear-gradient(140deg, #d4d4d8 0%, #a1a1aa 45%, #3f3f46 100%)",
+        gradient: (() => {
+          if (typeof row.gradient === "string" && row.gradient.includes("gradient")) return row.gradient;
+          if (typeof row.cssGradient === "string" && row.cssGradient.includes("gradient")) return row.cssGradient;
+          // Build gradient from colorPalette if provided
+          const palette = Array.isArray(row.colorPalette)
+            ? row.colorPalette.filter((c): c is string => typeof c === "string" && c.startsWith("#"))
+            : [];
+          if (palette.length >= 2) {
+            const stops = palette.slice(0, 3);
+            if (stops.length === 2) stops.push(stops[1]);
+            return `linear-gradient(140deg, ${stops[0]} 0%, ${stops[1]} 45%, ${stops[2]} 100%)`;
+          }
+          // Index-based fallback palette variety
+          const fallbacks = [
+            "linear-gradient(140deg, #f5f0e8 0%, #c9b99a 45%, #7a6248 100%)",
+            "linear-gradient(140deg, #0f172a 0%, #1e3a5f 45%, #2563eb 100%)",
+            "linear-gradient(140deg, #1a1a1a 0%, #2d2d2d 45%, #be123c 100%)",
+            "linear-gradient(140deg, #f0fdf4 0%, #86efac 45%, #16a34a 100%)",
+            "linear-gradient(140deg, #fafaf9 0%, #e7e5e4 45%, #a8a29e 100%)",
+          ];
+          return fallbacks[index % fallbacks.length];
+        })(),
         evidenceIds,
         imageUrl:
           typeof row.imageUrl === "string"
@@ -1322,6 +1389,7 @@ function normalizeModelPayload(
 
     for (const competitor of specificCompetitors.slice(0, 2)) {
       const competitorEvidenceIds = pickEvidenceIdsForCompetitor(
+        brand,
         competitor.label,
         safeEvidence,
         weakestBrandLink?.evidenceIds ?? safeEvidence.slice(0, 2).map((entry) => entry.id),
@@ -1341,6 +1409,7 @@ function normalizeModelPayload(
     if (!link.dominantCompetitor) continue;
     if (link.evidenceIds.length > 0) continue;
     link.evidenceIds = pickEvidenceIdsForCompetitor(
+      brand,
       link.dominantCompetitor,
       safeEvidence,
       safeEvidence.slice(0, 2).map((entry) => entry.id),
@@ -1361,7 +1430,7 @@ function normalizeModelPayload(
             aesthetic: "mixed",
             intent: "semantic overview",
             observedAt: now,
-            modelFamily: "Cross-model sample",
+            modelFamily: "ChatGPT",
             sentiment: "neutral",
             evidenceIds: [firstEvidenceId],
           },
@@ -1404,41 +1473,65 @@ async function synthesizeWithOpenAI(
   brand: string,
   sources: SourceItem[],
   openAiKey: string,
+  verifiedCompetitors: string[],
 ): Promise<SemanticUniversePayload> {
   const context = sources
-    .slice(0, 14)
+    .slice(0, 18)
     .map(
       (source, index) =>
-        `${index + 1}. [${source.provider}] ${source.title} | ${source.url}\nquery: ${source.query}\nsnippet: ${source.snippet.slice(0, 360)}`,
+        `${index + 1}. [${source.provider}] ${source.title} | ${source.url}\nquery: ${source.query}\nsnippet: ${source.snippet.slice(0, 400)}`,
     )
     .join("\n\n");
 
-  const prompt = `
-You are generating data for a brand semantic universe graph.
-Brand: ${brand}
+  const competitorConstraint =
+    verifiedCompetitors.length > 0
+      ? `VERIFIED COMPETITORS (found in source data — use ONLY these as competitor nodes, do not invent others):\n${verifiedCompetitors.map((c, i) => `  ${i + 1}. ${c}`).join("\n")}`
+      : `VERIFIED COMPETITORS: None identified in source data. Do not add competitor nodes — use gap nodes instead to represent areas where unnamed competitors dominate.`;
 
-Use the source context below to produce JSON only.
-Requirements:
-- Keep node coordinates in a 1180x760 canvas.
-- Include node id "brand-core" with label equal to the brand.
-- Return 8-14 nodes, 10-18 links.
-- Every link must include evidenceIds from provided evidence items.
-- Include gaps (missing links) where competitors dominate.
-- Keep evidence grounded in source snippets with realistic coOccurrence values.
-- Include semantic discourse examples with observed dates.
-- Include visual correlation cards with gradient CSS strings.
+  const prompt = `You are generating structured JSON for a brand semantic universe graph. Be precise and evidence-grounded.
 
-Return JSON matching:
+Brand under analysis: "${brand}"
+
+=== STRICT GROUNDING RULES ===
+1. COMPETITORS: ${competitorConstraint}
+   Do NOT invent competitor names not in the list above.
+   Infer competitor dominance from co-occurrence strength in shared intent spaces where both ${brand} and competitors appear in the source context.
+
+2. EVIDENCE: Every evidence item's aiResponse must paraphrase or quote directly from the source snippets below. Do not invent quotes, stats, or source titles.
+   Evidence should prioritize news-like or publication context where brand + competitor overlap can be assessed.
+
+3. NODE LABELS: Use specific, meaningful labels reflecting actual themes in the sources (e.g. "Capsule wardrobe", "Sustainable basics", "Direct competitors") — not generic terms like "cluster" or "market".
+
+4. GAPS: A gap node represents a real search intent cluster where ${brand} is absent or weak based on the sources. Only add a gap if the source data supports it.
+   Gap-to-competitor links must use evidenceIds with high coOccurrence in shared spaces.
+
+5. COORDINATES: 1180×760 canvas. Brand-core fixed at (590, 380). Spread other nodes across the canvas.
+
+=== OUTPUT SCHEMA ===
 {
-  "nodes": GraphNode[],
-  "links": GraphLink[],
-  "evidence": Evidence[],
-  "semanticDiscourse": SemanticDiscourseItem[],
-  "visualCorrelations": VisualCorrelationItem[]
+  "nodes": [{ "id": string, "label": string, "category": "brand"|"aesthetic"|"query"|"competitor"|"gap", "x": number, "y": number, "vx": 0, "vy": 0, "size": number, "anchorX": number, "anchorY": number, "fixed"?: boolean, "gapHint"?: string }],
+  "links": [{ "id": string, "source": string, "target": string, "weight": number (0–1), "evidenceIds": string[], "dominantCompetitor"?: string, "missing"?: boolean }],
+  "evidence": [{ "id": string, "query": string, "aiResponse": string, "sourceTitle": string, "sourceUrl": string, "coOccurrence": number (1–100), "timestamp": string (YYYY-MM-DD) }],
+  "semanticDiscourse": [{ "id": string, "phraseTemplate": string (use {brand} placeholder), "aesthetic": string, "intent": string, "observedAt": string, "modelFamily": string, "sentiment": "positive"|"neutral"|"mixed", "evidenceIds": string[] }],
+  "visualCorrelations": [{ "id": string, "title": string, "imageCue": string, "visualTags": string[], "correlationScore": number (0–1), "observedWindow": string, "gradient": string (valid CSS gradient), "evidenceIds": string[], "colorPalette": string[] }]
 }
 
-Source context:
-${context || "No external sources available."}
+=== VISUAL CORRELATION RULES ===
+Each visualCorrelation card represents a distinct aesthetic cluster observed in the sources. Follow these rules precisely:
+
+- "title": A specific, evocative cluster name drawn from the source language (e.g. "Industrial utility", "Coastal softness", "Dark heritage"). NOT generic like "Visual cluster 1".
+- "imageCue": A rich 1–2 sentence mood-board direction describing what a photo shoot for this cluster would look like — lighting, materials, silhouettes, setting, color register. Ground it in actual language from the source snippets.
+- "visualTags": 3–5 specific visual descriptors pulled directly from source snippets (e.g. ["raw linen", "concrete floors", "overcast daylight", "wide silhouette"]).
+- "correlationScore": Estimate based on how many evidence items reference this aesthetic cluster divided by total evidence. Strong clusters score 0.65–0.95. Gaps/competitor-dominated score 0.15–0.45.
+- "observedWindow": Derive a real date range from the evidence timestamps for this cluster (e.g. "Mar 04 – Apr 07, 2026"). Do not use generic "Observed around date".
+- "gradient": A carefully composed CSS linear-gradient that visually matches the cluster's color register. Use 3 color stops. Examples: warm neutrals → "#f5f0e8, #c9b99a, #7a6248". Dark industrial → "#1a1a1a, #2d3748, #4a5568". Do NOT default to gray every time.
+- "colorPalette": 3 hex color values that define this cluster's visual identity (matches the gradient stops).
+- "evidenceIds": Only include IDs of evidence items that actually reference this visual cluster.
+
+Produce: 8–14 nodes, 10–18 links (every link needs at least one evidenceId, include 2–4 missing:true gap links), 8–14 evidence items, 3–5 semanticDiscourse items, 4–5 visualCorrelations.
+
+=== SOURCE CONTEXT ===
+${context || "No external sources available — generate minimal fallback structure only."}
 `;
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -1476,46 +1569,104 @@ ${context || "No external sources available."}
   return normalized;
 }
 
+const encoder = new TextEncoder();
+
+function emitLine(controller: ReadableStreamDefaultController, event: object) {
+  controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
+}
+
 export async function POST(request: Request) {
-  try {
-    const body = (await request.json().catch(() => ({}))) as { brand?: string };
-    const brand = body.brand?.trim();
-    if (!brand) {
-      return NextResponse.json({ error: "Brand is required." }, { status: 400 });
-    }
-
-    const openAiKey = cleanEnvValue(process.env.OPENAI_API_KEY ?? process.env.OPENAI_API);
-    const tavilyKey = cleanEnvValue(process.env.TAVILY_API_KEY ?? process.env.TAVILY_API);
-    const exaKey = cleanEnvValue(process.env.EXA_API_KEY);
-
-    if (!openAiKey || !tavilyKey || !exaKey) {
-      return NextResponse.json(
-        {
-          error:
-            "Missing one or more required environment variables: OPENAI_API_KEY, TAVILY_API_KEY, EXA_API_KEY.",
-        },
-        { status: 500 },
-      );
-    }
-
-    const [tavilyResults, exaResults] = await Promise.all([
-      fetchTavily(brand, tavilyKey).catch(() => []),
-      fetchExa(brand, exaKey).catch(() => []),
-    ]);
-
-    const sources = dedupeByUrl([...tavilyResults, ...exaResults]).slice(0, 18);
-
-    try {
-      const payload = await synthesizeWithOpenAI(brand, sources, openAiKey);
-      const enriched = await enrichVisualCorrelationsWithImages(payload, sources);
-      return NextResponse.json(enriched);
-    } catch {
-      const fallback = buildFallback(brand, sources);
-      const enriched = await enrichVisualCorrelationsWithImages(fallback, sources);
-      return NextResponse.json(enriched);
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unexpected server error.";
-    return NextResponse.json({ error: message }, { status: 500 });
+  // Auth and access checks are synchronous — return early before starting the stream.
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("free_demo_used_at, stripe_status")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const subscriptionActive = isSubscriptionActive(profile?.stripe_status);
+  const demoAlreadyUsed = Boolean(profile?.free_demo_used_at);
+  if (!canUseSemanticTool(subscriptionActive, profile?.free_demo_used_at)) {
+    return NextResponse.json(
+      { error: "Subscription required.", code: "PAYWALL" },
+      { status: 402 },
+    );
+  }
+
+  const body = (await request.json().catch(() => ({}))) as { brand?: string };
+  const brand = body.brand?.trim();
+  if (!brand) {
+    return NextResponse.json({ error: "Brand is required." }, { status: 400 });
+  }
+
+  const openAiKey = cleanEnvValue(process.env.OPENAI_API_KEY ?? process.env.OPENAI_API);
+  const tavilyKey = cleanEnvValue(process.env.TAVILY_API_KEY ?? process.env.TAVILY_API);
+  const exaKey = cleanEnvValue(process.env.EXA_API_KEY);
+
+  if (!openAiKey || !tavilyKey || !exaKey) {
+    return NextResponse.json(
+      {
+        error:
+          "Missing one or more required environment variables: OPENAI_API_KEY, TAVILY_API_KEY, EXA_API_KEY.",
+      },
+      { status: 500 },
+    );
+  }
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        // Step 1: Web sources
+        emitLine(controller, { type: "step", id: "sources", status: "running" });
+        const [tavilyResults, exaResults] = await Promise.all([
+          fetchTavily(brand, tavilyKey).catch(() => [] as SourceItem[]),
+          fetchExa(brand, exaKey).catch(() => [] as SourceItem[]),
+        ]);
+        const sources = dedupeByUrl([...tavilyResults, ...exaResults]).slice(0, 18);
+        emitLine(controller, { type: "step", id: "sources", status: "done", detail: `${sources.length} sources collected` });
+
+        // Step 2: LLM synthesis
+        emitLine(controller, { type: "step", id: "synthesis", status: "running" });
+        const verifiedCompetitors = extractCompetitorNamesFromSources(brand, sources);
+        let payload: SemanticUniversePayload;
+        try {
+          payload = await synthesizeWithOpenAI(brand, sources, openAiKey, verifiedCompetitors);
+        } catch {
+          payload = buildFallback(brand, sources);
+        }
+        emitLine(controller, { type: "step", id: "synthesis", status: "done" });
+
+        // Step 3: Image enrichment
+        emitLine(controller, { type: "step", id: "images", status: "running" });
+        const enriched = await enrichVisualCorrelationsWithImages(payload, sources);
+        emitLine(controller, { type: "step", id: "images", status: "done" });
+
+        if (!subscriptionActive && !demoAlreadyUsed) {
+          await markFreeDemoUsed(user.id);
+        }
+
+        emitLine(controller, { type: "done", payload: enriched });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unexpected server error.";
+        emitLine(controller, { type: "error", message });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "application/x-ndjson",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
 }

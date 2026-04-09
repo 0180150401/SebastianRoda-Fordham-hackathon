@@ -1,15 +1,39 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
   --brand-primary: #0f766e;
   --brand-accent: #14b8a6;
+  --primary: oklch(0.85 0.15 55);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: #0a0a0a;
+  --color-muted: color-mix(in oklab, var(--foreground) 8%, var(--background) 92%);
+  --color-border: color-mix(in oklab, var(--foreground) 14%, var(--background) 86%);
+  --color-input: color-mix(in oklab, var(--foreground) 18%, var(--background) 82%);
+  /* Warm-tinted surfaces (primary) instead of gray foreground mix */
+  --color-card: color-mix(in oklab, var(--background) 90%, var(--primary) 10%);
+  --color-surface-inset: color-mix(in oklab, var(--background) 96%, var(--primary) 4%);
+  --color-chip: color-mix(in oklab, var(--background) 92%, var(--primary) 8%);
+  --color-muted-foreground: color-mix(
+    in oklab,
+    var(--foreground) 56%,
+    var(--background) 44%
+  );
+  --color-ring: color-mix(in oklab, var(--foreground) 35%, var(--background) 65%);
+  --color-ring-offset-background: var(--background);
+  --color-destructive: oklch(0.55 0.22 25);
+  --color-destructive-foreground: oklch(0.985 0 0);
+  --color-secondary: color-mix(in oklab, var(--foreground) 10%, var(--background) 90%);
+  --color-secondary-foreground: var(--foreground);
+  --color-accent: color-mix(in oklab, var(--foreground) 8%, var(--background) 92%);
+  --color-accent-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -23,8 +47,20 @@
   }
 }
 
+.dark {
+  --primary: oklch(0.85 0.15 55);
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
