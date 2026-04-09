@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { IconGithub, IconGoogle, IconLinkedIn } from "@/components/auth/oauth-icons";
 import { Eye, EyeOff, Mail, Lock, User } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { normalizeSiteOrigin } from "@/lib/site-url";
+import { buildAuthCallbackUrl } from "@/lib/site-url";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 interface FormFieldProps {
@@ -226,13 +226,6 @@ function safeRedirectPath(raw: string | null): string {
   return raw;
 }
 
-function getCallbackBaseUrl(): string {
-  const configured = normalizeSiteOrigin(process.env.NEXT_PUBLIC_SITE_URL);
-  if (configured) return configured;
-  if (typeof window !== "undefined") return window.location.origin;
-  return "https://6degree.noemtech.com";
-}
-
 type OAuthProviderId = "google" | "github" | "linkedin_oidc";
 
 export function SignInFlo() {
@@ -282,7 +275,7 @@ export function SignInFlo() {
           password,
           options: {
             data: { full_name: name.trim() },
-            emailRedirectTo: `${getCallbackBaseUrl()}/auth/callback?next=${encodeURIComponent(next)}`,
+            emailRedirectTo: buildAuthCallbackUrl(next),
           },
         });
         if (error) {
@@ -322,7 +315,7 @@ export function SignInFlo() {
     if (!supabase) return;
     setFormError(null);
     const next = safeRedirectPath(searchParams.get("redirect"));
-    const redirectTo = `${getCallbackBaseUrl()}/auth/callback?next=${encodeURIComponent(next)}`;
+    const redirectTo = buildAuthCallbackUrl(next);
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: { redirectTo },
@@ -340,7 +333,7 @@ export function SignInFlo() {
       return;
     }
     const { error } = await supabase.auth.resetPasswordForEmail(addr, {
-      redirectTo: `${getCallbackBaseUrl()}/auth/callback?next=/tool`,
+      redirectTo: buildAuthCallbackUrl("/tool"),
     });
     if (error) setFormError(error.message);
     else setFormSuccess("If an account exists, we sent a password reset link.");
