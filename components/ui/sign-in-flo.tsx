@@ -249,8 +249,25 @@ export function SignInFlo() {
 
   useEffect(() => {
     const err = searchParams.get("error");
+    const details = searchParams.get("details");
     if (err === "auth") {
       setFormError("Could not complete sign-in. Try again or use email and password.");
+    }
+    if (err === "oauth") {
+      const decoded = details
+        ? (() => {
+            try {
+              return decodeURIComponent(details);
+            } catch {
+              return details;
+            }
+          })()
+        : "";
+      setFormError(
+        decoded
+          ? `Sign-in was cancelled or failed: ${decoded}`
+          : "Sign-in was cancelled or the provider returned an error. Try again.",
+      );
     }
     if (err === "config") {
       setFormError(

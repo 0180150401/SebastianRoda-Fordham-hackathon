@@ -9,6 +9,12 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Let the Route Handler own PKCE exchange + Set-Cookie on the redirect response.
+  // Running getUser() here can race or duplicate cookie writes with /auth/callback.
+  if (request.nextUrl.pathname === "/auth/callback") {
+    return NextResponse.next();
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   });

@@ -14,8 +14,20 @@ function safeNextPath(raw: string | null): string {
 
 export async function GET(request: NextRequest) {
   const requestOrigin = request.nextUrl.origin;
-  const code = request.nextUrl.searchParams.get("code");
-  const next = safeNextPath(request.nextUrl.searchParams.get("next"));
+  const sp = request.nextUrl.searchParams;
+  const code = sp.get("code");
+  const next = safeNextPath(sp.get("next"));
+
+  const oauthError = sp.get("error");
+  const oauthDesc = sp.get("error_description");
+  if (oauthError) {
+    const u = new URL("/sign-in", requestOrigin);
+    u.searchParams.set("error", "oauth");
+    if (oauthDesc) {
+      u.searchParams.set("details", oauthDesc.slice(0, 300));
+    }
+    return NextResponse.redirect(u);
+  }
 
   const publicConfig = getSupabasePublicConfig();
   if (!publicConfig) {
@@ -52,6 +64,7 @@ export async function GET(request: NextRequest) {
     if (!error) {
       return redirectResponse;
     }
+    console.error("[auth/callback] exchangeCodeForSession:", error.message);
   }
 
   return NextResponse.redirect(new URL("/sign-in?error=auth", requestOrigin));
