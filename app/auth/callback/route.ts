@@ -4,6 +4,12 @@ import { NextResponse } from "next/server";
 import { supabaseCookieOptions } from "@/lib/supabase/cookie-options";
 import { getSupabasePublicConfig } from "@/lib/supabase/env";
 
+function safeNextPath(raw: string | null): string {
+  if (!raw) return "/tool";
+  if (!raw.startsWith("/") || raw.startsWith("//")) return "/tool";
+  return raw;
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const origin =
@@ -11,7 +17,7 @@ export async function GET(request: Request) {
     process.env.AUTH_URL ??
     new URL(request.url).origin;
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/tool";
+  const next = safeNextPath(searchParams.get("next"));
 
   const publicConfig = getSupabasePublicConfig();
   if (!publicConfig) {
