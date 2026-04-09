@@ -4,6 +4,17 @@
  * Accepts the legacy anon JWT (`NEXT_PUBLIC_SUPABASE_ANON_KEY`) or the newer publishable key names
  * shown in the Supabase dashboard (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_*`).
  */
+
+/** Trailing slashes break `/auth/v1/authorize` joins; host-only paste still works. */
+export function normalizeSupabaseProjectUrl(raw: string): string {
+  let u = raw.trim();
+  if (!u) return u;
+  if (!/^https?:\/\//i.test(u)) {
+    u = `https://${u}`;
+  }
+  return u.replace(/\/+$/, "");
+}
+
 function getSupabaseBrowserKey(): string | undefined {
   return (
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
@@ -13,10 +24,10 @@ function getSupabaseBrowserKey(): string | undefined {
 }
 
 export function getSupabasePublicConfig(): { url: string; anonKey: string } | null {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const anonKey = getSupabaseBrowserKey();
-  if (!url || !anonKey) return null;
-  return { url, anonKey };
+  if (!rawUrl || !anonKey) return null;
+  return { url: normalizeSupabaseProjectUrl(rawUrl), anonKey };
 }
 
 export function assertSupabasePublicConfig(): { url: string; anonKey: string } {
