@@ -10,7 +10,7 @@
 ## Phases
 
 - [x] **Phase 1: Stream Contract & Foundation Types** — Typed `PipelineEvent` union + FSM client hook; zero behavior change; unblocks all downstream phases (completed 2026-05-06)
-- [ ] **Phase 2: Observability, Security & Cost Controls** — Langfuse instrumentation, per-run telemetry, cost guards, and auth hardening before pipeline expansion
+- [x] **Phase 2: Observability, Security & Cost Controls** — Langfuse instrumentation, per-run telemetry, cost guards, and auth hardening before pipeline expansion (completed 2026-05-06)
 - [ ] **Phase 3: Pipeline Extraction & Scorer** — Decompose 1 600-line monolith into `lib/pipeline/` stage modules; add voyageai reranker
 - [ ] **Phase 4: Multi-Stage Retrieval & Query Planner** — LLM-driven query decomposition, multi-subquery fan-out, retrieval plan visible in stream
 - [ ] **Phase 5: Graph Synthesis Quality & Provenance** — Grounded edges with `source_ids[]`, passage-level evidence arrays, fallback visibility
@@ -137,7 +137,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Stream Contract & Foundation Types | 3/3 | Complete    | 2026-05-06 |
-| 2. Observability, Security & Cost Controls | 0/0 | Not started | — |
+| 2. Observability, Security & Cost Controls | 3/3 | Complete    | 2026-05-06 |
 | 3. Pipeline Extraction & Scorer | 0/0 | Not started | — |
 | 4. Multi-Stage Retrieval & Query Planner | 0/0 | Not started | — |
 | 5. Graph Synthesis Quality & Provenance | 0/0 | Not started | — |
