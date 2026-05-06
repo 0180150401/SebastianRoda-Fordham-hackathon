@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-last_updated: "2026-05-06T23:01:42.592Z"
+status: Ready to discuss
+last_updated: "2026-05-06T23:16:29.526Z"
 progress:
   total_phases: 7
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 13
-  completed_plans: 9
-  percent: 69
+  completed_plans: 13
+  percent: 100
 ---
 
 # State: 6-degrees v2
 
 **Updated:** 2026-05-06  
-**Session:** Phase 4 planned — ready to execute 4 plans
+**Session:** Phase 4 executed and verified — ready to discuss/research Phase 5
 
 ---
 
@@ -23,7 +23,7 @@ progress:
 
 **Core Value:** Users get a trustworthy, explorable graph of entities and relationships grounded in fresh web evidence, with clear provenance and legible model reasoning.
 
-**Current Focus:** Phase 4 — Multi-Stage Retrieval & Query Planner
+**Current Focus:** Phase 5 — Graph Synthesis Quality & Provenance
 
 ---
 
@@ -31,12 +31,12 @@ progress:
 
 | Field | Value |
 |-------|-------|
-| Phase | 4 — Multi-Stage Retrieval & Query Planner |
-| Plan | 0 / 4 planned tasks executed |
-| Status | Phase 4 planned — ready to execute |
-| Progress | ██████░░░░░░░░ 3 / 7 phases |
+| Phase | 5 — Graph Synthesis Quality & Provenance |
+| Plan | Not started |
+| Status | Phase 4 complete — Phase 5 ready for discussion/research |
+| Progress | ████████░░░░░░ 4 / 7 phases |
 
-**Next action:** `/gsd-execute-phase 4`
+**Next action:** `/gsd-discuss-phase 5`
 
 ---
 
@@ -44,9 +44,9 @@ progress:
 
 | Metric | Value |
 |--------|-------|
-| Phases complete | 3 / 7 |
+| Phases complete | 4 / 7 |
 | Plans authored | 13 (including 4 for Phase 4) |
-| Plans executed | 9 (through Phase 3) |
+| Plans executed | 13 (through Phase 4) |
 | Requirements mapped | 15 / 15 |
 | Sessions | — |
 
@@ -63,7 +63,7 @@ progress:
 - **Phase 1 (discuss):** NDJSON client is **fail-fast** (no silent skip on bad lines); **zod validates every event** in the FSM hook; hook owns parse+FSM only (page keeps `fetch`); **contract test runner = implementer choice** — see `.planning/phases/01-stream-contract-foundation-types/01-CONTEXT.md`
 - **Phase 2 (discuss):** **Langfuse + Supabase** per-run telemetry; **UTC daily cap** with **429 `DAILY_CAP`** (not paywall); **env kill switch**; **`geo-chat` authenticated** like semantic route — see `.planning/phases/02-observability-security-cost-controls/02-CONTEXT.md`
 - **Phase 3 (complete):** `app/api/semantic-universe/route.ts` decomposed into `lib/pipeline/*`; **Voyage `rerank-2.5`** runs before synthesis with timeout + no-key fallback; **POST verified at 40 lines** — see `.planning/phases/03-pipeline-extraction-scorer/03-VERIFICATION.md`
-- **Phase 4 (planned):** 4 plans cover `query_plan` stream contract, structured planner, planned Tavily/Exa fanout with source-quality filtering, degraded retrieval, and additive telemetry — see `.planning/phases/04-multi-stage-retrieval-query-planner/04-01-PLAN.md` through `04-04-PLAN.md`
+- **Phase 4 (complete):** `query_plan` stream contract, structured planner, planned Tavily/Exa fanout, source-quality filtering, degraded retrieval detail, and additive telemetry are implemented and verified — see `.planning/phases/04-multi-stage-retrieval-query-planner/04-VERIFICATION.md`
 
 ### Todos
 
@@ -72,6 +72,11 @@ progress:
 ### Blockers
 
 - (none)
+
+### Warnings
+
+- **Phase 4 production telemetry:** Apply `supabase/migrations/20260506210000_phase4_retrieval_stats.sql` with `supabase db push` before relying on new retrieval telemetry columns in production.
+- **Phase 4 UI smoke:** Manual `/tool` smoke with live credentials is recommended to confirm the trace panel copy in-browser.
 
 ### Research Flags (surface at plan time)
 
@@ -92,9 +97,9 @@ progress:
 
 ## Session Continuity
 
-**To resume:** `/gsd-execute-phase 4`
+**To resume:** `/gsd-discuss-phase 5`
 
 ---
 
 *State initialized: 2026-05-06*  
-*Last updated: 2026-05-06 after Phase 4 planning*
+*Last updated: 2026-05-06 after Phase 4 execution and verification*

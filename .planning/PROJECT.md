@@ -17,6 +17,7 @@ Users get a **trustworthy, explorable graph** of entities and relationships grou
 - ✓ **Typed NDJSON stream contract** — `PipelineEvent` + zod + `useSemanticUniverseStream` + contract tests (`lib/pipeline/*`, `hooks/use-semantic-universe-stream.ts`) — **Phase 1 (2026-05-06)**
 - ✓ Multi-source fetch (Tavily + Exa), dedupe, OpenAI synthesis, fallback graph — existing and now modularized under `lib/pipeline/` — **Phase 3 (2026-05-06)**
 - ✓ **Pipeline stage modularity + scorer** — route `POST` shell verified at 40 lines; retriever, scorer, enricher, structurer, and stream handler are independently importable/tested; Voyage rerank runs before synthesis when configured — **Phase 3 (2026-05-06)**
+- ✓ **Multi-stage retrieval and visible query planning** — structured query planner emits `query_plan`, runs planned Tavily/Exa fanout with failure isolation, filters low-quality sources before scoring/synthesis, and records aggregate retrieval telemetry — **Phase 4 (2026-05-06)**
 - ✓ Interactive tool UI consuming stream and rendering graph/workspace — existing (`app/tool/page.tsx`, `components/tool/*`)
 - ✓ Access policy: profiles, demo usage, Stripe checkout/webhook integration — existing (`app/api/tool/access`, `app/api/stripe/*`)
 
@@ -24,7 +25,7 @@ Users get a **trustworthy, explorable graph** of entities and relationships grou
 
 - [ ] Graph/network visualizer conveys structure, scale, and clusters more clearly (layout, performance, labeling, interaction)
 - [ ] Model outputs are **stronger**: better synthesis fidelity, grounded provenance, and guardrails against thin or misleading graphs
-- [ ] Web-research pipeline is **more complex**: richer query planning, additional retrieval stages, and clearer provenance in the stream
+- [ ] Source provenance is stronger: edge/source grounding, passage-level evidence, and visible fallback/degraded result types
 
 ### Out of Scope
 
@@ -51,6 +52,7 @@ Users get a **trustworthy, explorable graph** of entities and relationships grou
 | Treat this cycle as **brownfield enhancement** over mapped codebase | Avoid rewriting working auth, billing, and stream contract | — Pending |
 | Optimize for **legible graphs + evidence**, not raw token volume | Aligns with Core Value | — Pending |
 | Keep pipeline stages as importable server modules | Enables independent tests and safer Phase 4+ retrieval/synthesis work | Phase 3 validated |
+| Run one planned retrieval pass before synthesis | Improves evidence breadth while avoiding unbounded rescue loops | Phase 4 validated |
 
 ## Evolution
 
@@ -72,4 +74,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-06 after Phase 3 execution*
+*Last updated: 2026-05-06 after Phase 4 execution*

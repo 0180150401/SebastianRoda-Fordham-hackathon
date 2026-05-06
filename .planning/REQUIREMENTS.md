@@ -23,8 +23,8 @@
 
 ### Multi-stage retrieval & planning
 
-- [ ] **RTRY-01**: Retrieval uses multiple deliberate stages (planned sub-queries or equivalent) beyond a single Tavily + Exa pass, with deduplication and failure isolation between substeps.
-- [ ] **RTRY-02**: The stream exposes enough of the retrieval plan that a user can see what the system searched for without reading server logs.
+- [x] **RTRY-01**: Retrieval uses multiple deliberate stages (planned sub-queries or equivalent) beyond a single Tavily + Exa pass, with deduplication and failure isolation between substeps. *(Implemented 2026-05-06: structured query planner, planned Tavily/Exa fanout, provider timeouts, dedupe, partial-failure stats, source-quality filter before scoring.)*
+- [x] **RTRY-02**: The stream exposes enough of the retrieval plan that a user can see what the system searched for without reading server logs. *(Implemented 2026-05-06: typed `query_plan` event emitted before retrieval and preserved in `/tool` trace UI.)*
 
 ### Graph synthesis truthfulness & provenance
 
@@ -66,8 +66,8 @@
 | OBS-03 | Phase 2 — Observability, Security & Cost Controls | Pending |
 | PIPE-01 | Phase 3 — Pipeline Extraction & Scorer | Done |
 | PIPE-02 | Phase 3 — Pipeline Extraction & Scorer | Done |
-| RTRY-01 | Phase 4 — Multi-Stage Retrieval & Query Planner | Pending |
-| RTRY-02 | Phase 4 — Multi-Stage Retrieval & Query Planner | Pending |
+| RTRY-01 | Phase 4 — Multi-Stage Retrieval & Query Planner | Done |
+| RTRY-02 | Phase 4 — Multi-Stage Retrieval & Query Planner | Done |
 | SYN-01 | Phase 5 — Graph Synthesis Quality & Provenance | Pending |
 | SYN-02 | Phase 5 — Graph Synthesis Quality & Provenance | Pending |
 | VIS-01 | Phase 6 — Graph Visualization Upgrade | Pending |
