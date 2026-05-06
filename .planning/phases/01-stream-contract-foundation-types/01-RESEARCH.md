@@ -262,17 +262,11 @@ Planner implements `parseNdjsonEvents` to match hook logic `[ASSUMED: test API s
 
 **If planner proves A1/A2 wrong:** Adjust config or runner choice — no architectural change.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **`done.payload` validation depth for Phase 1**
-   - What we know: Full strict graph schema mirrors large server types; client already normalizes `[VERIFIED: normalizePayload usage]`.
-   - What's unclear: Whether product accepts “envelope validated + normalization function” as satisfying D-02 literally for inner payload fields.
-   - Recommendation: Interpret D-02 as “no unvalidated event objects reach FSM”; implement validation at the boundary with explicit strategy documented in PLAN.md.
+1. **`done.payload` validation depth for Phase 1** — **RESOLVED:** Envelope + `z.unknown()` for `payload` at the event boundary; graph normalization stays in extracted `lib/pipeline/normalize-payload.ts` (Plan 01-01 Task 2, Plan 01-03 wiring). Satisfies D-02 (“no unvalidated event objects reach FSM”) at the NDJSON line level.
 
-2. **Should the server optionally `schema.parse` before `emitLine`?**
-   - What we know: CONTEXT mandates client validation; server validation is additive hardening.
-   - What's unclear: Performance vs dual-parse cost on large `done` payloads.
-   - Recommendation: Planner defaults to client-only validation; optional Wave 2 task for server assert in development.
+2. **Should the server optionally `schema.parse` before `emitLine`?** — **RESOLVED:** Phase 1 uses **client-only** validation per plans; server hardening via `schema.parse` in the route is deferred. `emitLine` is typed as `(event: PipelineEvent)` so compile-time drift is caught (Plan 01-02 Task 3).
 
 ## Environment Availability
 

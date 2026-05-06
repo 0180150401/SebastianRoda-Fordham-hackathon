@@ -30,7 +30,10 @@
   2. Adding a new event type to the server requires only extending the shared union in `lib/pipeline/types.ts` — no fragile one-off client changes needed
   3. A contract test validates NDJSON parsing for every event type without a live server running
   4. The `/tool` page loads and streams with identical user-visible behavior after the type migration — zero regression
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 01-01-PLAN.md — Tooling foundation: install zod+vitest, vitest.config.ts, `lib/pipeline/types.ts` (PipelineEvent + zod schema), extract `normalizePayload` to `lib/pipeline/normalize-payload.ts`
+- [ ] 01-02-PLAN.md — Pure NDJSON parser (`lib/pipeline/ndjson.ts`), full contract test suite (every variant + chunk splitting + fail-fast), type `emitLine` against `PipelineEvent`
+- [ ] 01-03-PLAN.md — `useSemanticUniverseStream` hook (parse+validate+FSM only), refactor `app/tool/page.tsx` to consume it, manual UAT for SC4 zero-regression
 **Research flag**: skip — standard TypeScript discriminated unions and FSM hook patterns; well-documented
 **UI hint**: no
 
@@ -130,7 +133,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Stream Contract & Foundation Types | 0/0 | Not started | — |
+| 1. Stream Contract & Foundation Types | 0/3 | Planned | — |
 | 2. Observability, Security & Cost Controls | 0/0 | Not started | — |
 | 3. Pipeline Extraction & Scorer | 0/0 | Not started | — |
 | 4. Multi-Stage Retrieval & Query Planner | 0/0 | Not started | — |
