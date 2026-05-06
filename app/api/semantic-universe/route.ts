@@ -1,8 +1,19 @@
+import OpenAI from "openai";
+
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { canUseSemanticTool, isSubscriptionActive } from "@/lib/tool-access";
+import { createTracedOpenAI } from "@/lib/openai/traced-client";
+import { isSemanticPipelineDisabled } from "@/lib/observability/kill-switch";
+import {
+  applyOpenAiUsage,
+  assertDailyBudgetAllows,
+  DailyCapError,
+} from "@/lib/usage/daily-token-budget";
 import { NextResponse } from "next/server";
 import type { PipelineEvent } from "@/lib/pipeline/types";
+
+export const maxDuration = 300;
 
 function hasDemoCookie(request: Request): boolean {
   const cookie = request.headers.get("cookie") ?? "";
@@ -1478,9 +1489,12 @@ function normalizeModelPayload(
 async function synthesizeWithOpenAI(
   brand: string,
   sources: SourceItem[],
-  openAiKey: string,
+  openai: OpenAI,
   verifiedCompetitors: string[],
-): Promise<SemanticUniversePayload> {
+): Promise<{
+  payload: SemanticUniversePayload;
+  usage: { inputTokens: number; outputTokens: number };
+}> {
   const context = sources
     .slice(0, 18)
     .map(
@@ -1540,39 +1554,26 @@ Produce: 8–14 nodes, 10–18 links (every link needs at least one evidenceId, 
 ${context || "No external sources available — generate minimal fallback structure only."}
 `;
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${openAiKey}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "gpt-4.1-mini",
-      temperature: 0.3,
-      messages: [
-        { role: "system", content: "Return only valid JSON. Do not use markdown fences." },
-        { role: "user", content: prompt },
-      ],
-      response_format: { type: "json_object" },
-    }),
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4.1-mini",
+    temperature: 0.3,
+    messages: [
+      { role: "system", content: "Return only valid JSON. Do not use markdown fences." },
+      { role: "user", content: prompt },
+    ],
+    response_format: { type: "json_object" },
   });
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`OpenAI request failed: ${response.status} ${errText}`);
-  }
+  const inputTokens = completion.usage?.prompt_tokens ?? 0;
+  const outputTokens = completion.usage?.completion_tokens ?? 0;
 
-  const json = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-
-  const content = json.choices?.[0]?.message?.content ?? "";
+  const content = completion.choices[0]?.message?.content ?? "";
   const parsed = JSON.parse(extractJsonObject(content));
   const normalized = normalizeModelPayload(parsed, brand, sources);
   if (!normalized) {
     throw new Error("Model output could not be normalized.");
   }
-  return normalized;
+  return { payload: normalized, usage: { inputTokens, outputTokens } };
 }
 
 const encoder = new TextEncoder();
@@ -1582,7 +1583,13 @@ function emitLine(controller: ReadableStreamDefaultController, event: PipelineEv
 }
 
 export async function POST(request: Request) {
-  // Auth and access checks are synchronous — return early before starting the stream.
+  if (isSemanticPipelineDisabled()) {
+    return NextResponse.json(
+      { error: "Semantic pipeline temporarily disabled.", code: "PIPELINE_DISABLED" },
+      { status: 503 },
+    );
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -1607,6 +1614,18 @@ export async function POST(request: Request) {
     );
   }
 
+  try {
+    await assertDailyBudgetAllows(supabase, user.id);
+  } catch (err) {
+    if (err instanceof DailyCapError) {
+      return NextResponse.json(
+        { error: "Daily analysis budget exceeded. Try again tomorrow.", code: "DAILY_CAP" },
+        { status: 429 },
+      );
+    }
+    throw err;
+  }
+
   const body = (await request.json().catch(() => ({}))) as { brand?: string };
   const brand = body.brand?.trim();
   if (!brand) {
@@ -1627,37 +1646,82 @@ export async function POST(request: Request) {
     );
   }
 
+  const openai = createTracedOpenAI(openAiKey, {
+    userId: user.id,
+    traceName: "semantic-universe",
+  });
+  const runId = crypto.randomUUID();
+
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        // Step 1: Web sources
+        emitLine(controller, { type: "run_meta", run_id: runId });
+
         emitLine(controller, { type: "step", id: "sources", status: "running" });
+        const tSourcesStart = Date.now();
         const [tavilyResults, exaResults] = await Promise.all([
           fetchTavily(brand, tavilyKey).catch(() => [] as SourceItem[]),
           fetchExa(brand, exaKey).catch(() => [] as SourceItem[]),
         ]);
         const sources = dedupeByUrl([...tavilyResults, ...exaResults]).slice(0, 18);
-        emitLine(controller, { type: "step", id: "sources", status: "done", detail: `${sources.length} sources collected` });
+        const duration_ms_sources = Date.now() - tSourcesStart;
+        emitLine(controller, {
+          type: "step",
+          id: "sources",
+          status: "done",
+          detail: `${sources.length} sources collected`,
+        });
 
-        // Step 2: LLM synthesis
         emitLine(controller, { type: "step", id: "synthesis", status: "running" });
         const verifiedCompetitors = extractCompetitorNamesFromSources(brand, sources);
         let payload: SemanticUniversePayload;
+        let result_type: "success" | "fallback" | "error" = "success";
+        let openaiInput = 0;
+        let openaiOutput = 0;
+        const tSynthStart = Date.now();
         try {
-          payload = await synthesizeWithOpenAI(brand, sources, openAiKey, verifiedCompetitors);
+          const syn = await synthesizeWithOpenAI(brand, sources, openai, verifiedCompetitors);
+          payload = syn.payload;
+          openaiInput = syn.usage.inputTokens;
+          openaiOutput = syn.usage.outputTokens;
+          result_type = "success";
         } catch {
           payload = buildFallback(brand, sources);
+          result_type = "fallback";
         }
+        const duration_ms_synthesis = Date.now() - tSynthStart;
         emitLine(controller, { type: "step", id: "synthesis", status: "done" });
 
-        // Step 3: Image enrichment
         emitLine(controller, { type: "step", id: "images", status: "running" });
+        const tImgStart = Date.now();
         const enriched = await enrichVisualCorrelationsWithImages(payload, sources);
+        const duration_ms_images = Date.now() - tImgStart;
         emitLine(controller, { type: "step", id: "images", status: "done" });
 
         if (!subscriptionActive && !demoAlreadyUsed) {
           await markFreeDemoUsed(user.id);
         }
+
+        const { error: insErr } = await supabase.from("semantic_pipeline_runs").insert({
+          run_id: runId,
+          user_id: user.id,
+          brand,
+          completed_at: new Date().toISOString(),
+          duration_ms_sources,
+          duration_ms_synthesis,
+          duration_ms_images,
+          openai_input_tokens: openaiInput,
+          openai_output_tokens: openaiOutput,
+          retrieval_units: 1,
+          node_count: enriched.nodes.length,
+          edge_count: enriched.links.length,
+          source_count: sources.length,
+          result_type,
+          langfuse_trace_id: null,
+        });
+        if (insErr) console.error("[semantic-universe] telemetry insert", insErr);
+
+        await applyOpenAiUsage(supabase, user.id, { input: openaiInput, output: openaiOutput }, 1);
 
         emitLine(controller, { type: "done", payload: enriched });
       } catch (error) {

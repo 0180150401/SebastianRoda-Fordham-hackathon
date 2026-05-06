@@ -34,6 +34,13 @@ describe("PipelineEvent contract — variant coverage", () => {
     const ev = parseNdjsonEvents([j({ type: "error", message: "boom" }) + "\n"]);
     expect(ev[0]).toEqual({ type: "error", message: "boom" });
   });
+
+  it("parses run_meta with uuid run_id", () => {
+    const runId = "550e8400-e29b-41d4-a716-446655440000";
+    const ev = parseNdjsonEvents([j({ type: "run_meta", run_id: runId }) + "\n"]);
+    expect(ev[0]).toEqual({ type: "run_meta", run_id: runId });
+    expect(pipelineEventSchema.safeParse(ev[0]).success).toBe(true);
+  });
 });
 
 describe("Chunk-splitting invariance (STREAM-02)", () => {

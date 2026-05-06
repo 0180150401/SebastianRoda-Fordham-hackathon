@@ -9,6 +9,11 @@ export type StepStatus = (typeof STEP_STATUSES)[number];
 /** Mitigate DoS via oversized NDJSON lines; parser should enforce. */
 export const MAX_NDJSON_LINE_BYTES = 1_000_000;
 
+const runMetaEventSchema = z.object({
+  type: z.literal("run_meta"),
+  run_id: z.string().uuid(),
+});
+
 const stepEventSchema = z.object({
   type: z.literal("step"),
   id: z.enum(STEP_IDS),
@@ -27,12 +32,14 @@ const errorEventSchema = z.object({
 });
 
 export const pipelineEventSchema = z.discriminatedUnion("type", [
+  runMetaEventSchema,
   stepEventSchema,
   doneEventSchema,
   errorEventSchema,
 ]);
 
 export type PipelineEvent = z.infer<typeof pipelineEventSchema>;
+export type RunMetaEvent = z.infer<typeof runMetaEventSchema>;
 export type StepEvent = z.infer<typeof stepEventSchema>;
 export type DoneEvent = z.infer<typeof doneEventSchema>;
 export type ErrorEvent = z.infer<typeof errorEventSchema>;

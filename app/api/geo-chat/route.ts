@@ -1,3 +1,11 @@
+import { createClient } from "@/lib/supabase/server";
+import { createTracedOpenAI } from "@/lib/openai/traced-client";
+import { isSemanticPipelineDisabled } from "@/lib/observability/kill-switch";
+import {
+  applyOpenAiUsage,
+  assertDailyBudgetAllows,
+  DailyCapError,
+} from "@/lib/usage/daily-token-budget";
 import { NextResponse } from "next/server";
 
 type ChatRole = "user" | "assistant";
@@ -61,9 +69,36 @@ function normalizeUniverse(value: unknown): SemanticUniversePayload {
 
 export async function POST(request: Request) {
   try {
+    if (isSemanticPipelineDisabled()) {
+      return NextResponse.json(
+        { error: "Semantic pipeline temporarily disabled.", code: "PIPELINE_DISABLED" },
+        { status: 503 },
+      );
+    }
+
     const openAiKey = cleanEnvValue(process.env.OPENAI_API_KEY ?? process.env.OPENAI_API);
     if (!openAiKey) {
       return NextResponse.json({ error: "Missing OPENAI_API_KEY." }, { status: 500 });
+    }
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    try {
+      await assertDailyBudgetAllows(supabase, user.id);
+    } catch (err) {
+      if (err instanceof DailyCapError) {
+        return NextResponse.json(
+          { error: "Daily analysis budget exceeded. Try again tomorrow.", code: "DAILY_CAP" },
+          { status: 429 },
+        );
+      }
+      throw err;
     }
 
     const body = (await request.json().catch(() => ({}))) as {
@@ -107,13 +142,14 @@ export async function POST(request: Request) {
       "9) End with one crisp next-step recommendation sentence.",
     ].join("\n");
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${openAiKey}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
+    const openai = createTracedOpenAI(openAiKey, {
+      userId: user.id,
+      traceName: "geo-chat",
+    });
+
+    let completion;
+    try {
+      completion = await openai.chat.completions.create({
         model: "gpt-4.1-mini",
         temperature: 0.35,
         messages: [
@@ -129,24 +165,20 @@ export async function POST(request: Request) {
           },
           ...conversation.map((entry) => ({ role: entry.role, content: entry.content })),
         ],
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      return NextResponse.json(
-        { error: `OpenAI request failed: ${response.status} ${errText}` },
-        { status: 500 },
-      );
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return NextResponse.json({ error: `OpenAI request failed: ${msg}` }, { status: 500 });
     }
 
-    const json = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const reply = json.choices?.[0]?.message?.content?.trim();
+    const reply = completion.choices?.[0]?.message?.content?.trim();
     if (!reply) {
       return NextResponse.json({ error: "No response generated." }, { status: 500 });
     }
+
+    const inputTokens = completion.usage?.prompt_tokens ?? 0;
+    const outputTokens = completion.usage?.completion_tokens ?? 0;
+    await applyOpenAiUsage(supabase, user.id, { input: inputTokens, output: outputTokens }, 0);
 
     return NextResponse.json({ reply });
   } catch (error) {

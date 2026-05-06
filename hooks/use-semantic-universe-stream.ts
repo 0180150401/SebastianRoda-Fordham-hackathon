@@ -19,7 +19,9 @@ export function useSemanticUniverseStream() {
 
     const dispatch = (events: PipelineEvent[]) => {
       for (const ev of events) {
-        if (ev.type === "step") callbacks.onStep?.(ev);
+        if (ev.type === "run_meta") {
+          /* correlation-only — UI ignores run_id */
+        } else if (ev.type === "step") callbacks.onStep?.(ev);
         else if (ev.type === "done") callbacks.onDone?.(ev);
         else if (ev.type === "error") callbacks.onError?.(ev);
       }

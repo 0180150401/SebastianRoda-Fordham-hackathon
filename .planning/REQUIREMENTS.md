@@ -12,9 +12,9 @@
 
 ### Observability, security, and cost
 
-- [ ] **OBS-01**: Each semantic run records measurable telemetry (latency by stage, token/cost proxies, counts of nodes/edges/sources) sufficient to compare quality changes before versus after pipeline work.
-- [ ] **OBS-02**: Guardrails prevent runaway cost from retrieval or enrichment fan-out (caps, backoff, kill switches, or equivalent production-safe controls).
-- [ ] **OBS-03**: API routes reachable from the client that perform paid or sensitive work require the same authentication and authorization posture as the rest of the tool (no orphaned public callers).
+- [x] **OBS-01**: Each semantic run records measurable telemetry (latency by stage, token/cost proxies, counts of nodes/edges/sources) sufficient to compare quality changes before versus after pipeline work. *(Implemented 2026-05-06: Supabase `semantic_pipeline_runs` + optional Langfuse tracing via OpenAI SDK; apply migration + configure Langfuse env before relying on dashboards.)*
+- [x] **OBS-02**: Guardrails prevent runaway cost from retrieval or enrichment fan-out (caps, backoff, kill switches, or equivalent production-safe controls). *(Implemented 2026-05-06: UTC pseudo-token budget `SEMANTIC_DAILY_TOKEN_BUDGET`, retrieval charge env, kill switch `SEMANTIC_PIPELINE_DISABLED`, route `maxDuration`.)*
+- [x] **OBS-03**: API routes reachable from the client that perform paid or sensitive work require the same authentication and authorization posture as the rest of the tool (no orphaned public callers). *(Implemented 2026-05-06: `/api/geo-chat` requires Supabase session; confirm callers send `credentials: 'include'`.)*
 
 ### Pipeline structure & retrieval quality
 
