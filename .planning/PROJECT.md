@@ -14,6 +14,7 @@ Users get a **trustworthy, explorable graph** of entities and relationships grou
 
 - ✓ Sign-in via Supabase (OAuth/email), session cookies, `/tool` protection via middleware and client gates — existing (`middleware.ts`, `lib/supabase/*`, `components/auth/*`)
 - ✓ Streaming semantic analysis API returning NDJSON steps — existing (`app/api/semantic-universe/route.ts`)
+- ✓ **Typed NDJSON stream contract** — `PipelineEvent` + zod + `useSemanticUniverseStream` + contract tests (`lib/pipeline/*`, `hooks/use-semantic-universe-stream.ts`) — **Phase 1 (2026-05-06)**
 - ✓ Multi-source fetch (Tavily + Exa), dedupe, OpenAI synthesis, fallback graph — existing (same route)
 - ✓ Interactive tool UI consuming stream and rendering graph/workspace — existing (`app/tool/page.tsx`, `components/tool/*`)
 - ✓ Access policy: profiles, demo usage, Stripe checkout/webhook integration — existing (`app/api/tool/access`, `app/api/stripe/*`)
@@ -69,4 +70,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-06 after initialization*
+*Last updated: 2026-05-06 after Phase 1 execution*

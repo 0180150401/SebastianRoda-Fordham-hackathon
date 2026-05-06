@@ -7,8 +7,8 @@
 
 ### Stream contract & client consumption
 
-- [ ] **STREAM-01**: Typed `PipelineEvent` (or equivalent) defines the NDJSON stream contract shared by `app/api/semantic-universe` and the `/tool` client, without breaking existing step semantics users rely on today.
-- [ ] **STREAM-02**: Client stream handling is encapsulated (FSM hook or equivalent), replacing ad-hoc parsing so new event types can be added safely.
+- [x] **STREAM-01**: Typed `PipelineEvent` (or equivalent) defines the NDJSON stream contract shared by `app/api/semantic-universe` and the `/tool` client, without breaking existing step semantics users rely on today. *(Implemented 2026-05-06; confirm in-browser UAT.)*
+- [x] **STREAM-02**: Client stream handling is encapsulated (FSM hook or equivalent), replacing ad-hoc parsing so new event types can be added safely. *(Implemented 2026-05-06; confirm in-browser UAT.)*
 
 ### Observability, security, and cost
 
@@ -59,8 +59,8 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STREAM-01 | Phase 1 — Stream Contract & Foundation Types | Pending |
-| STREAM-02 | Phase 1 — Stream Contract & Foundation Types | Pending |
+| STREAM-01 | Phase 1 — Stream Contract & Foundation Types | Done (UAT pending) |
+| STREAM-02 | Phase 1 — Stream Contract & Foundation Types | Done (UAT pending) |
 | OBS-01 | Phase 2 — Observability, Security & Cost Controls | Pending |
 | OBS-02 | Phase 2 — Observability, Security & Cost Controls | Pending |
 | OBS-03 | Phase 2 — Observability, Security & Cost Controls | Pending |
@@ -82,4 +82,4 @@
 
 ---
 *Requirements defined: 2026-05-06*  
-*Last updated: 2026-05-06 after roadmap creation — traceability complete*
+*Last updated: 2026-05-06 — STREAM-01/02 marked done after Phase 1 code landing (browser UAT recommended)*

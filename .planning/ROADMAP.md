@@ -9,7 +9,7 @@
 
 ## Phases
 
-- [ ] **Phase 1: Stream Contract & Foundation Types** — Typed `PipelineEvent` union + FSM client hook; zero behavior change; unblocks all downstream phases
+- [x] **Phase 1: Stream Contract & Foundation Types** — Typed `PipelineEvent` union + FSM client hook; zero behavior change; unblocks all downstream phases (completed 2026-05-06)
 - [ ] **Phase 2: Observability, Security & Cost Controls** — Langfuse instrumentation, per-run telemetry, cost guards, and auth hardening before pipeline expansion
 - [ ] **Phase 3: Pipeline Extraction & Scorer** — Decompose 1 600-line monolith into `lib/pipeline/` stage modules; add voyageai reranker
 - [ ] **Phase 4: Multi-Stage Retrieval & Query Planner** — LLM-driven query decomposition, multi-subquery fan-out, retrieval plan visible in stream
@@ -31,9 +31,9 @@
   3. A contract test validates NDJSON parsing for every event type without a live server running
   4. The `/tool` page loads and streams with identical user-visible behavior after the type migration — zero regression
 **Plans**: 3 plans
-- [ ] 01-01-PLAN.md — Tooling foundation: install zod+vitest, vitest.config.ts, `lib/pipeline/types.ts` (PipelineEvent + zod schema), extract `normalizePayload` to `lib/pipeline/normalize-payload.ts`
-- [ ] 01-02-PLAN.md — Pure NDJSON parser (`lib/pipeline/ndjson.ts`), full contract test suite (every variant + chunk splitting + fail-fast), type `emitLine` against `PipelineEvent`
-- [ ] 01-03-PLAN.md — `useSemanticUniverseStream` hook (parse+validate+FSM only), refactor `app/tool/page.tsx` to consume it, manual UAT for SC4 zero-regression
+- [x] 01-01-PLAN.md — Tooling foundation: install zod+vitest, vitest.config.ts, `lib/pipeline/types.ts` (PipelineEvent + zod schema), extract `normalizePayload` to `lib/pipeline/normalize-payload.ts`
+- [x] 01-02-PLAN.md — Pure NDJSON parser (`lib/pipeline/ndjson.ts`), full contract test suite (every variant + chunk splitting + fail-fast), type `emitLine` against `PipelineEvent`
+- [x] 01-03-PLAN.md — `useSemanticUniverseStream` hook (parse+validate+FSM only), refactor `app/tool/page.tsx` to consume it, manual UAT for SC4 zero-regression
 **Research flag**: skip — standard TypeScript discriminated unions and FSM hook patterns; well-documented
 **UI hint**: no
 
@@ -133,7 +133,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Stream Contract & Foundation Types | 0/3 | Planned | — |
+| 1. Stream Contract & Foundation Types | 3/3 | Complete    | 2026-05-06 |
 | 2. Observability, Security & Cost Controls | 0/0 | Not started | — |
 | 3. Pipeline Extraction & Scorer | 0/0 | Not started | — |
 | 4. Multi-Stage Retrieval & Query Planner | 0/0 | Not started | — |
