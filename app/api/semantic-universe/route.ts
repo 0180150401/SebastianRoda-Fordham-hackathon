@@ -25,6 +25,7 @@ import type {
   VisualCorrelationItem,
 } from "@/lib/pipeline/models";
 import { dedupeByUrl, retrieveSourcesForBrand } from "@/lib/pipeline/retriever";
+import { scoreSourcesForSynthesis } from "@/lib/pipeline/scorer";
 
 export const maxDuration = 300;
 
@@ -1453,6 +1454,7 @@ export async function POST(request: Request) {
   const openAiKey = cleanEnvValue(process.env.OPENAI_API_KEY ?? process.env.OPENAI_API);
   const tavilyKey = cleanEnvValue(process.env.TAVILY_API_KEY ?? process.env.TAVILY_API);
   const exaKey = cleanEnvValue(process.env.EXA_API_KEY);
+  const voyageKey = cleanEnvValue(process.env.VOYAGE_API_KEY);
 
   if (!openAiKey || !tavilyKey || !exaKey) {
     return NextResponse.json(
@@ -1478,29 +1480,34 @@ export async function POST(request: Request) {
         emitLine(controller, { type: "step", id: "sources", status: "running" });
         const tSourcesStart = Date.now();
         const sources = await retrieveSourcesForBrand(brand, { tavilyKey, exaKey });
+        const rankedSources = await scoreSourcesForSynthesis(sources, brand, {
+          voyageApiKey: voyageKey,
+          timeoutMs: 8000,
+          topN: 18,
+        });
         const duration_ms_sources = Date.now() - tSourcesStart;
         emitLine(controller, {
           type: "step",
           id: "sources",
           status: "done",
-          detail: `${sources.length} sources collected`,
+          detail: `${sources.length} sources collected, ${rankedSources.length} reranked for synthesis`,
         });
 
         emitLine(controller, { type: "step", id: "synthesis", status: "running" });
-        const verifiedCompetitors = extractCompetitorNamesFromSources(brand, sources);
+        const verifiedCompetitors = extractCompetitorNamesFromSources(brand, rankedSources);
         let payload: SemanticUniversePayload;
         let result_type: "success" | "fallback" | "error" = "success";
         let openaiInput = 0;
         let openaiOutput = 0;
         const tSynthStart = Date.now();
         try {
-          const syn = await synthesizeWithOpenAI(brand, sources, openai, verifiedCompetitors);
+          const syn = await synthesizeWithOpenAI(brand, rankedSources, openai, verifiedCompetitors);
           payload = syn.payload;
           openaiInput = syn.usage.inputTokens;
           openaiOutput = syn.usage.outputTokens;
           result_type = "success";
         } catch {
-          payload = buildFallback(brand, sources);
+          payload = buildFallback(brand, rankedSources);
           result_type = "fallback";
         }
         const duration_ms_synthesis = Date.now() - tSynthStart;
@@ -1508,7 +1515,7 @@ export async function POST(request: Request) {
 
         emitLine(controller, { type: "step", id: "images", status: "running" });
         const tImgStart = Date.now();
-        const enriched = await enrichVisualCorrelationsWithImages(payload, sources);
+        const enriched = await enrichVisualCorrelationsWithImages(payload, rankedSources);
         const duration_ms_images = Date.now() - tImgStart;
         emitLine(controller, { type: "step", id: "images", status: "done" });
 
@@ -1529,7 +1536,7 @@ export async function POST(request: Request) {
           retrieval_units: 1,
           node_count: enriched.nodes.length,
           edge_count: enriched.links.length,
-          source_count: sources.length,
+          source_count: rankedSources.length,
           result_type,
           langfuse_trace_id: null,
         });
