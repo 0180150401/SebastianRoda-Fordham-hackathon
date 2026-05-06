@@ -206,17 +206,21 @@ function coerceQueryPlan(candidate: unknown, brand: string, opts: { runId?: stri
   const boundedCount = queries.filter((query) => query.recency === "bounded").length;
   if (queries.length < opts.limits.minQueries || boundedCount < 1 || boundedCount > 2) return null;
 
-  return {
+  const displayItems = parsed.data.display.items.filter((item) =>
+    queries.some((query) => query.id === item.id),
+  );
+  const repaired: QueryPlanEvent = {
     ...parsed.data,
     plan_id: parsed.data.plan_id || `${opts.runId ?? crypto.randomUUID()}:retrieval-plan`,
     display: {
       ...parsed.data.display,
-      items: parsed.data.display.items.filter((item) =>
-        queries.some((query) => query.id === item.id),
-      ),
+      items: displayItems.length > 0
+        ? displayItems
+        : queries.map(({ id, label, intent }) => ({ id, label, intent })),
     },
     queries,
   };
+  return pipelineEventSchema.safeParse(repaired).success ? repaired : null;
 }
 
 export async function planRetrievalQueries(
