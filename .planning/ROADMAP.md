@@ -49,9 +49,9 @@
   3. The `/api/geo-chat` endpoint (and any equivalent callers performing paid or sensitive work) returns 401 for unauthenticated requests
   4. A cost anomaly running for more than 10 minutes is detectable and stoppable via a kill switch before it causes financial damage
 **Plans**:
-- [ ] `02-01-PLAN.md` — Supabase `semantic_pipeline_runs` + `user_daily_usage` migration, RLS, `.env.example` knobs
-- [ ] `02-02-PLAN.md` — `run_meta` stream event, Langfuse + OpenAI SDK tracing, semantic-universe DB telemetry insert + `maxDuration`
-- [ ] `02-03-PLAN.md` — Kill switch + UTC daily pseudo-token cap, geo-chat auth + traced completions + Vitest budget helpers
+- [x] `02-01-PLAN.md` — Supabase `semantic_pipeline_runs` + `user_daily_usage` migration, RLS, `.env.example` knobs
+- [x] `02-02-PLAN.md` — `run_meta` stream event, Langfuse + OpenAI SDK tracing, semantic-universe DB telemetry insert + `maxDuration`
+- [x] `02-03-PLAN.md` — Kill switch + UTC daily pseudo-token cap, geo-chat auth + traced completions + Vitest budget helpers
 **Research flag**: skip — Langfuse `observeOpenAI()` integration and Supabase per-run logging are standard documented patterns
 **UI hint**: no
 
@@ -62,11 +62,14 @@
 **Depends on**: Phase 2
 **Requirements**: PIPE-01, PIPE-02
 **Success Criteria** (what must be TRUE):
-  1. The route handler is ≤60 lines and delegates all stage logic to `lib/pipeline/` modules (`retriever`, `enricher`, `scorer`)
+  1. `export async function POST` in the route is ≤65 lines (including blanks) and delegates stage logic to `lib/pipeline/` modules (`retriever`, `scorer`, `enricher`, `structurer`, stream wiring)
   2. Each stage module can be imported and unit-tested in isolation without instantiating the route
   3. The voyageai reranker scores merged Tavily+Exa results before they reach OpenAI synthesis — higher-signal evidence enters the LLM, producing measurably fewer low-confidence edges
   4. Existing streaming behavior and all user-visible output is unchanged after the refactor (confirmed by contract test from Phase 1)
-**Plans**: TBD
+**Plans**: 3 plans (`.planning/phases/03-pipeline-extraction-scorer/`)
+- [ ] `03-01-PLAN.md` — `lib/pipeline/models.ts`, `lib/pipeline/retriever.ts` (`retrieveSourcesForBrand`, `dedupeByUrl`), Vitest `retriever.test.ts`, route rewires
+- [ ] `03-02-PLAN.md` — `voyageai` rerank (`lib/pipeline/scorer.ts`), `VOYAGE_API_KEY`, wire ranked sources before synthesis, `scorer.test.ts`
+- [ ] `03-03-PLAN.md` — `enricher`, `structurer`, `stream-handler.ts`, slim POST shell, `structurer.test.ts`
 **Research flag**: skip — standard module extraction refactor; architecture research provides the exact file structure and build order
 **UI hint**: no
 
