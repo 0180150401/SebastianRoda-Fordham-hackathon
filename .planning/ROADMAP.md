@@ -48,7 +48,10 @@
   2. A run that would exceed the per-user daily spend cap is rejected with a clear error — no silent overruns are possible
   3. The `/api/geo-chat` endpoint (and any equivalent callers performing paid or sensitive work) returns 401 for unauthenticated requests
   4. A cost anomaly running for more than 10 minutes is detectable and stoppable via a kill switch before it causes financial damage
-**Plans**: TBD
+**Plans**:
+- [ ] `02-01-PLAN.md` — Supabase `semantic_pipeline_runs` + `user_daily_usage` migration, RLS, `.env.example` knobs
+- [ ] `02-02-PLAN.md` — `run_meta` stream event, Langfuse + OpenAI SDK tracing, semantic-universe DB telemetry insert + `maxDuration`
+- [ ] `02-03-PLAN.md` — Kill switch + UTC daily pseudo-token cap, geo-chat auth + traced completions + Vitest budget helpers
 **Research flag**: skip — Langfuse `observeOpenAI()` integration and Supabase per-run logging are standard documented patterns
 **UI hint**: no
 
