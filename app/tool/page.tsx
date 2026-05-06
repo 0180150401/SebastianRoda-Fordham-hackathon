@@ -12,6 +12,9 @@ import { ToolPaywall } from "@/components/tool/tool-paywall";
 import AgentPlan, { type AgentPlanTask } from "@/components/ui/agent-plan";
 import { ToolAccessGate, useToolAccess } from "@/components/tool/tool-access-gate";
 import { cn } from "@/lib/utils";
+import { useSemanticUniverseStream } from "@/hooks/use-semantic-universe-stream";
+import { normalizePayload } from "@/lib/pipeline/normalize-payload";
+import type { StepId } from "@/lib/pipeline/types";
 
 const VIEW_WIDTH = 1180;
 const VIEW_HEIGHT = 760;
@@ -97,25 +100,10 @@ type SemanticUniversePayload = {
   modelStrength: ModelStrengthSeed[];
 };
 
-type StepId = "sources" | "synthesis" | "images";
-type StreamEvent =
-  | { type: "step"; id: StepId; status: "running" | "done" | "error"; detail?: string }
-  | { type: "done"; payload: LoosePayload }
-  | { type: "error"; message: string };
-
 type ToolAccessPayload = {
   subscriptionActive: boolean;
   hasFreeDemoRemaining: boolean;
 };
-
-type LoosePayload = Partial<{
-  nodes: unknown;
-  links: unknown;
-  evidence: unknown;
-  semanticDiscourse: unknown;
-  visualCorrelations: unknown;
-  modelStrength: unknown;
-}>;
 
 const EVIDENCE: Evidence[] = [
   {
@@ -340,126 +328,6 @@ const VISUAL_CORRELATIONS: VisualCorrelationItem[] = [
     evidenceIds: ["ev-11", "ev-09"],
   },
 ];
-
-function normalizePayload(payload: LoosePayload): SemanticUniversePayload {
-  const nodes = Array.isArray(payload.nodes)
-    ? (payload.nodes as GraphNode[]).filter(
-        (node) =>
-          typeof node?.id === "string" &&
-          typeof node?.label === "string" &&
-          typeof node?.category === "string",
-      )
-    : [];
-
-  const links = Array.isArray(payload.links)
-    ? (payload.links as GraphLink[]).filter(
-        (link) =>
-          typeof link?.id === "string" &&
-          typeof link?.source === "string" &&
-          typeof link?.target === "string" &&
-          typeof link?.weight === "number",
-      )
-    : [];
-
-  const evidence = Array.isArray(payload.evidence)
-    ? (payload.evidence as Evidence[]).filter(
-        (item) =>
-          typeof item?.id === "string" &&
-          typeof item?.query === "string" &&
-          typeof item?.aiResponse === "string" &&
-          typeof item?.sourceTitle === "string" &&
-          typeof item?.sourceUrl === "string",
-      )
-    : [];
-
-  const semanticDiscourse = Array.isArray(payload.semanticDiscourse)
-    ? (payload.semanticDiscourse as Array<SemanticDiscourseItem & { phrase?: string; model?: string }>).map(
-        (item, index) => ({
-          id: item?.id ?? `sd-${index + 1}`,
-          phraseTemplate:
-            typeof item?.phraseTemplate === "string"
-              ? item.phraseTemplate
-              : typeof item?.phrase === "string"
-                ? item.phrase
-                : "Users discuss {brand} in a variety of semantic contexts.",
-          aesthetic: item?.aesthetic ?? "unspecified",
-          intent: item?.intent ?? "unspecified",
-          observedAt: item?.observedAt ?? new Date().toISOString().slice(0, 10),
-          modelFamily:
-            typeof item?.modelFamily === "string"
-              ? item.modelFamily
-              : typeof item?.model === "string"
-                ? item.model
-                : "mixed models",
-          sentiment:
-            item?.sentiment === "positive" || item?.sentiment === "neutral" || item?.sentiment === "mixed"
-              ? item.sentiment
-              : "neutral",
-          evidenceIds: Array.isArray(item?.evidenceIds)
-            ? item.evidenceIds.filter((evidenceId): evidenceId is string => typeof evidenceId === "string")
-            : [],
-        }),
-      )
-    : [];
-
-  const visualCorrelations = Array.isArray(payload.visualCorrelations)
-    ? (payload.visualCorrelations as VisualCorrelationItem[]).map((item, index) => ({
-        id: item?.id ?? `vc-${index + 1}`,
-        title: item?.title ?? "Visual correlation",
-        imageCue: item?.imageCue ?? "No visual cue available.",
-        visualTags: Array.isArray(item?.visualTags)
-          ? item.visualTags.filter((tag): tag is string => typeof tag === "string")
-          : [],
-        correlationScore:
-          typeof item?.correlationScore === "number"
-            ? Math.max(0, Math.min(1, item.correlationScore))
-            : 0.5,
-        observedWindow: item?.observedWindow ?? "Observation window unavailable",
-        gradient:
-          item?.gradient ??
-          "linear-gradient(140deg, #d4d4d8 0%, #a1a1aa 45%, #3f3f46 100%)",
-        evidenceIds: Array.isArray(item?.evidenceIds)
-          ? item.evidenceIds.filter((evidenceId): evidenceId is string => typeof evidenceId === "string")
-          : [],
-        imageUrl:
-          typeof item?.imageUrl === "string" && item.imageUrl.length > 0
-            ? item.imageUrl
-            : undefined,
-        imageSource:
-          typeof item?.imageSource === "string" && item.imageSource.length > 0
-            ? item.imageSource
-            : undefined,
-        moodboardMode: typeof item?.moodboardMode === "boolean" ? item.moodboardMode : undefined,
-      }))
-    : [];
-
-  const modelStrength = Array.isArray(payload.modelStrength)
-    ? (payload.modelStrength as ModelStrengthSeed[]).filter(
-        (item) =>
-          typeof item?.model === "string" &&
-          typeof item?.avg === "number" &&
-          typeof item?.count === "number",
-      )
-    : payload.modelStrength &&
-        typeof payload.modelStrength === "object" &&
-        Array.isArray((payload.modelStrength as { models?: unknown[] }).models)
-      ? ((payload.modelStrength as { models: ModelStrengthSeed[] }).models ?? []).filter(
-          (item) =>
-            typeof item?.model === "string" &&
-            typeof item?.avg === "number" &&
-            typeof item?.count === "number",
-        )
-      : [];
-
-  return {
-    nodes: nodes.length ? nodes : INITIAL_GRAPH.nodes,
-    links: links.length ? links : INITIAL_GRAPH.links,
-    evidence: evidence.length ? evidence : EVIDENCE,
-    semanticDiscourse: semanticDiscourse.length ? semanticDiscourse : SEMANTIC_DISCOURSE,
-    visualCorrelations: visualCorrelations.length ? visualCorrelations : VISUAL_CORRELATIONS,
-    modelStrength,
-  };
-}
 
 function buildGraph(brand: string): { nodes: GraphNode[]; links: GraphLink[] } {
   const normalizedBrand = brand.trim() || "Your brand";
@@ -894,6 +762,7 @@ function ToolPageInner() {
   const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const panStartRef = useRef({ x: 0, y: 0 });
+  const { consume } = useSemanticUniverseStream();
 
   useEffect(() => {
     if (subscriptionActive) {
@@ -1027,47 +896,29 @@ function ToolPageInner() {
         throw new Error(err?.error ?? "Semantic analysis request failed.");
       }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-          try {
-            const event = JSON.parse(trimmed) as StreamEvent;
-            if (event.type === "step") {
-              setAgentTasks((prev) => applyStepEvent(prev, event.id, event.status));
-            } else if (event.type === "done") {
-              const payload = normalizePayload(event.payload);
-              applyUniversePayload(payload, targetBrand);
-              if (!subscriptionActive && typeof window !== "undefined") {
-                // Client fallback guard so demo usage is enforced even if profile writes lag/fail.
-                window.localStorage.setItem(DEMO_STORAGE_KEY, "1");
-              }
-              setAgentTasks((prev) =>
-                prev.map((t) => ({
-                  ...t,
-                  status: "completed" as const,
-                  subtasks: t.subtasks.map((s) => ({ ...s, status: "completed" as const })),
-                })),
-              );
-            } else if (event.type === "error") {
-              throw new Error(event.message);
-            }
-          } catch (parseError) {
-            if (parseError instanceof SyntaxError) continue;
-            throw parseError;
+      await consume(response.body, {
+        onStep: (event) => {
+          setAgentTasks((prev) => applyStepEvent(prev, event.id, event.status));
+        },
+        onDone: (event) => {
+          const payload = normalizePayload(event.payload);
+          applyUniversePayload(payload, targetBrand);
+          if (!subscriptionActive && typeof window !== "undefined") {
+            window.localStorage.setItem(DEMO_STORAGE_KEY, "1");
           }
-        }
-      }
+          setAgentTasks((prev) =>
+            prev.map((t) => ({
+              ...t,
+              status: "completed" as const,
+              subtasks: t.subtasks.map((s) => ({ ...s, status: "completed" as const })),
+            })),
+          );
+        },
+        onError: (event) => {
+          throw new Error(event.message);
+        },
+        onFatal: () => {},
+      });
 
       if (hasFreeDemoRemaining && !subscriptionActive) {
         void refetchAccess();
