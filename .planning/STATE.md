@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-last_updated: "2026-05-06T22:30:39.427Z"
+status: Ready to execute
+last_updated: "2026-05-06T23:01:42.592Z"
 progress:
   total_phases: 7
   completed_phases: 3
-  total_plans: 9
+  total_plans: 13
   completed_plans: 9
-  percent: 100
+  percent: 69
 ---
 
 # State: 6-degrees v2
 
 **Updated:** 2026-05-06  
-**Session:** Phase 3 executed and verified — ready to discuss/research Phase 4
+**Session:** Phase 4 planned — ready to execute 4 plans
 
 ---
 
@@ -32,11 +32,11 @@ progress:
 | Field | Value |
 |-------|-------|
 | Phase | 4 — Multi-Stage Retrieval & Query Planner |
-| Plan | Not started |
-| Status | Phase 3 complete — Phase 4 ready for research/discussion |
+| Plan | 0 / 4 planned tasks executed |
+| Status | Phase 4 planned — ready to execute |
 | Progress | ██████░░░░░░░░ 3 / 7 phases |
 
-**Next action:** `/gsd-discuss-phase 4`
+**Next action:** `/gsd-execute-phase 4`
 
 ---
 
@@ -45,7 +45,7 @@ progress:
 | Metric | Value |
 |--------|-------|
 | Phases complete | 3 / 7 |
-| Plans authored | 9 (3 per phase for phases 1–3) |
+| Plans authored | 13 (including 4 for Phase 4) |
 | Plans executed | 9 (through Phase 3) |
 | Requirements mapped | 15 / 15 |
 | Sessions | — |
@@ -63,6 +63,7 @@ progress:
 - **Phase 1 (discuss):** NDJSON client is **fail-fast** (no silent skip on bad lines); **zod validates every event** in the FSM hook; hook owns parse+FSM only (page keeps `fetch`); **contract test runner = implementer choice** — see `.planning/phases/01-stream-contract-foundation-types/01-CONTEXT.md`
 - **Phase 2 (discuss):** **Langfuse + Supabase** per-run telemetry; **UTC daily cap** with **429 `DAILY_CAP`** (not paywall); **env kill switch**; **`geo-chat` authenticated** like semantic route — see `.planning/phases/02-observability-security-cost-controls/02-CONTEXT.md`
 - **Phase 3 (complete):** `app/api/semantic-universe/route.ts` decomposed into `lib/pipeline/*`; **Voyage `rerank-2.5`** runs before synthesis with timeout + no-key fallback; **POST verified at 40 lines** — see `.planning/phases/03-pipeline-extraction-scorer/03-VERIFICATION.md`
+- **Phase 4 (planned):** 4 plans cover `query_plan` stream contract, structured planner, planned Tavily/Exa fanout with source-quality filtering, degraded retrieval, and additive telemetry — see `.planning/phases/04-multi-stage-retrieval-query-planner/04-01-PLAN.md` through `04-04-PLAN.md`
 
 ### Todos
 
@@ -74,14 +75,14 @@ progress:
 
 ### Research Flags (surface at plan time)
 
-- **Phase 4:** Needs `/gsd-research-phase` — LLM query decomposition (ACQO + PAR²-RAG anchoring strategies)
+- **Phase 4:** Satisfied — `.planning/phases/04-multi-stage-retrieval-query-planner/04-RESEARCH.md`
 - **Phase 5:** Needs `/gsd-research-phase` — Passage extraction approach and `evidence[]` provenance schema design
 - **Phase 6:** Needs `/gsd-research-phase` — sigma/react-sigma v5 migration path from current renderer
 
 ### Known Gaps to Validate During Planning
 
 - **Phase 3 review warning:** Add SSRF protections around image enrichment source URL fetches.
-- **Phase 3 review warning:** Add per-request Tavily/Exa timeouts so one stalled upstream request cannot hang the sources step.
+- **Phase 3 review warning:** Add per-request Tavily/Exa timeouts so one stalled upstream request cannot hang the sources step. Covered by Phase 4 Plan 04-03.
 - **Supabase `pipeline_runs` schema:** Review before Phase 2 planning to confirm no conflict with existing `profiles` and access-control tables
 - **OpenAI structured output + large graph schemas:** Flag for Phase 5 planning; add `max_tokens` guard and streaming JSON validation empirically
 - **LLM prompt design for query planner:** Quality is highly prompt-dependent; allocate explicit iteration time during Phase 4 before treating planner as stable
@@ -91,9 +92,9 @@ progress:
 
 ## Session Continuity
 
-**To resume:** `/gsd-discuss-phase 4`
+**To resume:** `/gsd-execute-phase 4`
 
 ---
 
 *State initialized: 2026-05-06*  
-*Last updated: 2026-05-06 after Phase 3 execution and verification*
+*Last updated: 2026-05-06 after Phase 4 planning*

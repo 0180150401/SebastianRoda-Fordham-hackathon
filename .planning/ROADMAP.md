@@ -84,8 +84,12 @@
   2. The system issues 5–12 targeted sub-queries per run instead of a single broad pass, producing richer and more diverse source coverage
   3. Bot-blocked or low-quality sources (<150 tokens, or containing bot-block signals) are filtered before synthesis — no garbage-in sources reach the LLM
   4. A single sub-query failure does not abort the pipeline — results are partial but valid, with the failure isolated and logged
-**Plans**: TBD
-**Research flag**: yes — `/gsd-research-phase` required. LLM-driven query decomposition has documented failure modes (over-expansion, topic drift); research ACQO adaptive query optimization and PAR²-RAG breadth-first anchoring strategies before designing the planner prompt
+**Plans**: 4 plans (`.planning/phases/04-multi-stage-retrieval-query-planner/`)
+- [ ] `04-01-PLAN.md` — `query_plan` stream contract, contract tests, hook state, and friendly trace rendering
+- [ ] `04-02-PLAN.md` — Structured query planner, adaptive caps, deterministic fallback, env-configurable retrieval limits
+- [ ] `04-03-PLAN.md` — Plan-aware Tavily/Exa fanout, provider timeouts, failure isolation, source-quality filter
+- [ ] `04-04-PLAN.md` — Stream orchestration, aggregate counts, degraded retrieval reason, additive telemetry migration
+**Research flag**: satisfied — `.planning/phases/04-multi-stage-retrieval-query-planner/04-RESEARCH.md`
 **UI hint**: no
 
 ---
@@ -142,7 +146,7 @@
 | 1. Stream Contract & Foundation Types | 3/3 | Complete    | 2026-05-06 |
 | 2. Observability, Security & Cost Controls | 3/3 | Complete    | 2026-05-06 |
 | 3. Pipeline Extraction & Scorer | 3/3 | Complete | 2026-05-06 |
-| 4. Multi-Stage Retrieval & Query Planner | 0/0 | Not started | — |
+| 4. Multi-Stage Retrieval & Query Planner | 0/4 | Planned | — |
 | 5. Graph Synthesis Quality & Provenance | 0/0 | Not started | — |
 | 6. Graph Visualization Upgrade | 0/0 | Not started | — |
 | 7. Evidence Panel & UX Polish | 0/0 | Not started | — |
@@ -174,4 +178,4 @@
 ---
 
 *Roadmap created: 2026-05-06*  
-*Last updated: 2026-05-06 after initialization*
+*Last updated: 2026-05-06 after Phase 4 planning*
