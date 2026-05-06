@@ -1,7 +1,7 @@
 # State: 6-degrees v2
 
 **Updated:** 2026-05-06  
-**Session:** Phase 1 context gathered (`01-CONTEXT.md`)
+**Session:** Phase 1 planned (3 plans)
 
 ---
 
@@ -18,11 +18,11 @@
 | Field | Value |
 |-------|-------|
 | Phase | 1 — Stream Contract & Foundation Types |
-| Plan | — (not started) |
-| Status | Context ready — run plan-phase |
+| Plan | 01-01 … 01-03 (3 waves) |
+| Status | Ready to execute |
 | Progress | ░░░░░░░░░░░░░░ 0 / 7 phases |
 
-**Next action:** `/gsd-plan-phase 1`
+**Next action:** `/gsd-execute-phase 1`
 
 ---
 
@@ -31,7 +31,7 @@
 | Metric | Value |
 |--------|-------|
 | Phases complete | 0 / 7 |
-| Plans complete | 0 |
+| Plans complete | 3 |
 | Requirements mapped | 15 / 15 |
 | Sessions | 2 |
 
