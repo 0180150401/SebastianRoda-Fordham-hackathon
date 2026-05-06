@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Executing Phase 03
-last_updated: "2026-05-06T21:11:43.993Z"
+status: Ready to plan
+last_updated: "2026-05-06T21:38:16.191Z"
 progress:
   total_phases: 7
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 9
-  completed_plans: 6
-  percent: 67
+  completed_plans: 9
+  percent: 100
 ---
 
 # State: 6-degrees v2
 
 **Updated:** 2026-05-06  
-**Session:** Phase 3 planned — 3 PLAN files + CONTEXT + RESEARCH + VALIDATION (`03-*`)
+**Session:** Phase 3 executed and verified — ready to discuss/research Phase 4
 
 ---
 
@@ -23,22 +23,20 @@ progress:
 
 **Core Value:** Users get a trustworthy, explorable graph of entities and relationships grounded in fresh web evidence, with clear provenance and legible model reasoning.
 
-**Current Focus:** Phase 03 — pipeline-extraction-scorer
+**Current Focus:** Phase 4 — Multi-Stage Retrieval & Query Planner
 
 ---
 
 ## Current Position
 
-Phase: 03 (pipeline-extraction-scorer) — EXECUTING
-Plan: 1 of 3
 | Field | Value |
 |-------|-------|
-| Phase | 3 — Pipeline Extraction & Scorer |
-| Plan | 03-01, 03-02, 03-03 (ready to execute) |
-| Status | Phase 3 planning complete — ready to execute |
-| Progress | ██░░░░░░░░░░░░ 2 / 7 phases |
+| Phase | 4 — Multi-Stage Retrieval & Query Planner |
+| Plan | Not started |
+| Status | Phase 3 complete — Phase 4 ready for research/discussion |
+| Progress | ██████░░░░░░░░ 3 / 7 phases |
 
-**Next action:** `/gsd-execute-phase 3`
+**Next action:** `/gsd-discuss-phase 4`
 
 ---
 
@@ -46,9 +44,9 @@ Plan: 1 of 3
 
 | Metric | Value |
 |--------|-------|
-| Phases complete | 2 / 7 |
+| Phases complete | 3 / 7 |
 | Plans authored | 9 (3 per phase for phases 1–3) |
-| Plans executed | 6 (through Phase 2, pending Phase 3) |
+| Plans executed | 9 (through Phase 3) |
 | Requirements mapped | 15 / 15 |
 | Sessions | — |
 
@@ -64,7 +62,7 @@ Plan: 1 of 3
 - **Optimize for legible graphs + evidence, not raw token volume** — aligns with Core Value; guides trade-off decisions within phases
 - **Phase 1 (discuss):** NDJSON client is **fail-fast** (no silent skip on bad lines); **zod validates every event** in the FSM hook; hook owns parse+FSM only (page keeps `fetch`); **contract test runner = implementer choice** — see `.planning/phases/01-stream-contract-foundation-types/01-CONTEXT.md`
 - **Phase 2 (discuss):** **Langfuse + Supabase** per-run telemetry; **UTC daily cap** with **429 `DAILY_CAP`** (not paywall); **env kill switch**; **`geo-chat` authenticated** like semantic route — see `.planning/phases/02-observability-security-cost-controls/02-CONTEXT.md`
-- **Phase 3 (plan):** Decompose `app/api/semantic-universe/route.ts` into `lib/pipeline/*`; **Voyage `rerank-2.5`** before synthesis with timeout + no-key fallback; **POST ≤65 lines** — see `.planning/phases/03-pipeline-extraction-scorer/03-CONTEXT.md`
+- **Phase 3 (complete):** `app/api/semantic-universe/route.ts` decomposed into `lib/pipeline/*`; **Voyage `rerank-2.5`** runs before synthesis with timeout + no-key fallback; **POST verified at 40 lines** — see `.planning/phases/03-pipeline-extraction-scorer/03-VERIFICATION.md`
 
 ### Todos
 
@@ -82,7 +80,8 @@ Plan: 1 of 3
 
 ### Known Gaps to Validate During Planning
 
-- **voyageai reranker latency:** ~300ms in benchmarks; validate under Vercel Fluid Compute with timeout guard (Phase 3 scorer task)
+- **Phase 3 review warning:** Add SSRF protections around image enrichment source URL fetches.
+- **Phase 3 review warning:** Add per-request Tavily/Exa timeouts so one stalled upstream request cannot hang the sources step.
 - **Supabase `pipeline_runs` schema:** Review before Phase 2 planning to confirm no conflict with existing `profiles` and access-control tables
 - **OpenAI structured output + large graph schemas:** Flag for Phase 5 planning; add `max_tokens` guard and streaming JSON validation empirically
 - **LLM prompt design for query planner:** Quality is highly prompt-dependent; allocate explicit iteration time during Phase 4 before treating planner as stable
@@ -92,9 +91,9 @@ Plan: 1 of 3
 
 ## Session Continuity
 
-**To resume:** `.planning/phases/03-pipeline-extraction-scorer/03-01-PLAN.md` then `/gsd-execute-phase 3`
+**To resume:** `/gsd-discuss-phase 4`
 
 ---
 
 *State initialized: 2026-05-06*  
-*Last updated: 2026-05-06 after Phase 3 plan-phase*
+*Last updated: 2026-05-06 after Phase 3 execution and verification*

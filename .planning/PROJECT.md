@@ -15,15 +15,16 @@ Users get a **trustworthy, explorable graph** of entities and relationships grou
 - ✓ Sign-in via Supabase (OAuth/email), session cookies, `/tool` protection via middleware and client gates — existing (`middleware.ts`, `lib/supabase/*`, `components/auth/*`)
 - ✓ Streaming semantic analysis API returning NDJSON steps — existing (`app/api/semantic-universe/route.ts`)
 - ✓ **Typed NDJSON stream contract** — `PipelineEvent` + zod + `useSemanticUniverseStream` + contract tests (`lib/pipeline/*`, `hooks/use-semantic-universe-stream.ts`) — **Phase 1 (2026-05-06)**
-- ✓ Multi-source fetch (Tavily + Exa), dedupe, OpenAI synthesis, fallback graph — existing (same route)
+- ✓ Multi-source fetch (Tavily + Exa), dedupe, OpenAI synthesis, fallback graph — existing and now modularized under `lib/pipeline/` — **Phase 3 (2026-05-06)**
+- ✓ **Pipeline stage modularity + scorer** — route `POST` shell verified at 40 lines; retriever, scorer, enricher, structurer, and stream handler are independently importable/tested; Voyage rerank runs before synthesis when configured — **Phase 3 (2026-05-06)**
 - ✓ Interactive tool UI consuming stream and rendering graph/workspace — existing (`app/tool/page.tsx`, `components/tool/*`)
 - ✓ Access policy: profiles, demo usage, Stripe checkout/webhook integration — existing (`app/api/tool/access`, `app/api/stripe/*`)
 
 ### Active
 
 - [ ] Graph/network visualizer conveys structure, scale, and clusters more clearly (layout, performance, labeling, interaction)
-- [ ] Model outputs are **stronger**: better retrieval relevance, synthesis fidelity, and guardrails against thin or misleading graphs
-- [ ] Web-research pipeline is **more complex**: richer query planning, additional retrieval stages, scoring/ranking, and clearer provenance in the stream
+- [ ] Model outputs are **stronger**: better synthesis fidelity, grounded provenance, and guardrails against thin or misleading graphs
+- [ ] Web-research pipeline is **more complex**: richer query planning, additional retrieval stages, and clearer provenance in the stream
 
 ### Out of Scope
 
@@ -49,6 +50,7 @@ Users get a **trustworthy, explorable graph** of entities and relationships grou
 |----------|-----------|---------|
 | Treat this cycle as **brownfield enhancement** over mapped codebase | Avoid rewriting working auth, billing, and stream contract | — Pending |
 | Optimize for **legible graphs + evidence**, not raw token volume | Aligns with Core Value | — Pending |
+| Keep pipeline stages as importable server modules | Enables independent tests and safer Phase 4+ retrieval/synthesis work | Phase 3 validated |
 
 ## Evolution
 
@@ -70,4 +72,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-06 after Phase 1 execution*
+*Last updated: 2026-05-06 after Phase 3 execution*

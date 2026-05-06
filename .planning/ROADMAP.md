@@ -11,7 +11,7 @@
 
 - [x] **Phase 1: Stream Contract & Foundation Types** — Typed `PipelineEvent` union + FSM client hook; zero behavior change; unblocks all downstream phases (completed 2026-05-06)
 - [x] **Phase 2: Observability, Security & Cost Controls** — Langfuse instrumentation, per-run telemetry, cost guards, and auth hardening before pipeline expansion (completed 2026-05-06)
-- [ ] **Phase 3: Pipeline Extraction & Scorer** — Decompose 1 600-line monolith into `lib/pipeline/` stage modules; add voyageai reranker
+- [x] **Phase 3: Pipeline Extraction & Scorer** — Decompose 1 600-line monolith into `lib/pipeline/` stage modules; add voyageai reranker (completed 2026-05-06)
 - [ ] **Phase 4: Multi-Stage Retrieval & Query Planner** — LLM-driven query decomposition, multi-subquery fan-out, retrieval plan visible in stream
 - [ ] **Phase 5: Graph Synthesis Quality & Provenance** — Grounded edges with `source_ids[]`, passage-level evidence arrays, fallback visibility
 - [ ] **Phase 6: Graph Visualization Upgrade** — sigma/graphology WebGL renderer; Louvain clusters; node/edge type encoding; ForceAtlas2 layout
@@ -67,9 +67,9 @@
   3. The voyageai reranker scores merged Tavily+Exa results before they reach OpenAI synthesis — higher-signal evidence enters the LLM, producing measurably fewer low-confidence edges
   4. Existing streaming behavior and all user-visible output is unchanged after the refactor (confirmed by contract test from Phase 1)
 **Plans**: 3 plans (`.planning/phases/03-pipeline-extraction-scorer/`)
-- [ ] `03-01-PLAN.md` — `lib/pipeline/models.ts`, `lib/pipeline/retriever.ts` (`retrieveSourcesForBrand`, `dedupeByUrl`), Vitest `retriever.test.ts`, route rewires
-- [ ] `03-02-PLAN.md` — `voyageai` rerank (`lib/pipeline/scorer.ts`), `VOYAGE_API_KEY`, wire ranked sources before synthesis, `scorer.test.ts`
-- [ ] `03-03-PLAN.md` — `enricher`, `structurer`, `stream-handler.ts`, slim POST shell, `structurer.test.ts`
+- [x] `03-01-PLAN.md` — `lib/pipeline/models.ts`, `lib/pipeline/retriever.ts` (`retrieveSourcesForBrand`, `dedupeByUrl`), Vitest `retriever.test.ts`, route rewires
+- [x] `03-02-PLAN.md` — `voyageai` rerank (`lib/pipeline/scorer.ts`), `VOYAGE_API_KEY`, wire ranked sources before synthesis, `scorer.test.ts`
+- [x] `03-03-PLAN.md` — `enricher`, `structurer`, `stream-handler.ts`, slim POST shell, `structurer.test.ts`
 **Research flag**: skip — standard module extraction refactor; architecture research provides the exact file structure and build order
 **UI hint**: no
 
@@ -141,7 +141,7 @@
 |-------|----------------|--------|-----------|
 | 1. Stream Contract & Foundation Types | 3/3 | Complete    | 2026-05-06 |
 | 2. Observability, Security & Cost Controls | 3/3 | Complete    | 2026-05-06 |
-| 3. Pipeline Extraction & Scorer | 0/0 | Not started | — |
+| 3. Pipeline Extraction & Scorer | 3/3 | Complete | 2026-05-06 |
 | 4. Multi-Stage Retrieval & Query Planner | 0/0 | Not started | — |
 | 5. Graph Synthesis Quality & Provenance | 0/0 | Not started | — |
 | 6. Graph Visualization Upgrade | 0/0 | Not started | — |

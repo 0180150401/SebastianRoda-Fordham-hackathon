@@ -18,8 +18,8 @@
 
 ### Pipeline structure & retrieval quality
 
-- [ ] **PIPE-01**: Semantic pipeline logic is modularized (`lib/pipeline/` or equivalent) with a slim route coordinator, preserving current behavior while enabling independent stage changes.
-- [ ] **PIPE-02**: A scoring or reranking stage filters merged web results before synthesis so the LLM consumes higher-signal evidence.
+- [x] **PIPE-01**: Semantic pipeline logic is modularized (`lib/pipeline/` or equivalent) with a slim route coordinator, preserving current behavior while enabling independent stage changes. *(Implemented 2026-05-06: `lib/pipeline/` models, retriever, scorer, enricher, structurer, and stream handler; route `POST` verified at 40 lines.)*
+- [x] **PIPE-02**: A scoring or reranking stage filters merged web results before synthesis so the LLM consumes higher-signal evidence. *(Implemented 2026-05-06: Voyage `rerank-2.5` scorer with deterministic no-key/error fallback.)*
 
 ### Multi-stage retrieval & planning
 
@@ -64,8 +64,8 @@
 | OBS-01 | Phase 2 — Observability, Security & Cost Controls | Pending |
 | OBS-02 | Phase 2 — Observability, Security & Cost Controls | Pending |
 | OBS-03 | Phase 2 — Observability, Security & Cost Controls | Pending |
-| PIPE-01 | Phase 3 — Pipeline Extraction & Scorer | Pending |
-| PIPE-02 | Phase 3 — Pipeline Extraction & Scorer | Pending |
+| PIPE-01 | Phase 3 — Pipeline Extraction & Scorer | Done |
+| PIPE-02 | Phase 3 — Pipeline Extraction & Scorer | Done |
 | RTRY-01 | Phase 4 — Multi-Stage Retrieval & Query Planner | Pending |
 | RTRY-02 | Phase 4 — Multi-Stage Retrieval & Query Planner | Pending |
 | SYN-01 | Phase 5 — Graph Synthesis Quality & Provenance | Pending |
@@ -82,4 +82,4 @@
 
 ---
 *Requirements defined: 2026-05-06*  
-*Last updated: 2026-05-06 — STREAM-01/02 marked done after Phase 1 code landing (browser UAT recommended)*
+*Last updated: 2026-05-06 — PIPE-01/02 marked done after Phase 3 verification*
