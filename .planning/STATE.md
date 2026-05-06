@@ -1,7 +1,7 @@
 # State: 6-degrees v2
 
 **Updated:** 2026-05-06  
-**Session:** Roadmap initialized
+**Session:** Phase 1 context gathered (`01-CONTEXT.md`)
 
 ---
 
@@ -19,7 +19,7 @@
 |-------|-------|
 | Phase | 1 — Stream Contract & Foundation Types |
 | Plan | — (not started) |
-| Status | Not started |
+| Status | Context ready — run plan-phase |
 | Progress | ░░░░░░░░░░░░░░ 0 / 7 phases |
 
 **Next action:** `/gsd-plan-phase 1`
@@ -33,7 +33,7 @@
 | Phases complete | 0 / 7 |
 | Plans complete | 0 |
 | Requirements mapped | 15 / 15 |
-| Sessions | 1 |
+| Sessions | 2 |
 
 ---
 
@@ -45,6 +45,7 @@
 - **New additive libraries approved by research:** `sigma@^3`, `graphology@^0.26`, `@react-sigma/core@^5`, `graphology-layout-forceatlas2`, `graphology-communities-louvain`, `graphology-metrics`, `voyageai` (reranker), `langfuse@^3`, `exa-js` SDK (official), `openai@^6.35`, `zod@^4`
 - **Phase order mandated by architecture research:** types → observability → extraction → retrieval → synthesis → visualization → polish. Do not skip or reorder.
 - **Optimize for legible graphs + evidence, not raw token volume** — aligns with Core Value; guides trade-off decisions within phases
+- **Phase 1 (discuss):** NDJSON client is **fail-fast** (no silent skip on bad lines); **zod validates every event** in the FSM hook; hook owns parse+FSM only (page keeps `fetch`); **contract test runner = implementer choice** — see `.planning/phases/01-stream-contract-foundation-types/01-CONTEXT.md`
 
 ### Todos
 
@@ -72,9 +73,9 @@
 
 ## Session Continuity
 
-**To resume:** Read this file + `.planning/ROADMAP.md`, then run `/gsd-progress`
+**To resume:** Read this file + `.planning/phases/01-stream-contract-foundation-types/01-CONTEXT.md`, then run `/gsd-plan-phase 1`
 
 ---
 
 *State initialized: 2026-05-06*  
-*Last updated: 2026-05-06 after roadmap creation*
+*Last updated: 2026-05-06 after Phase 1 discuss-phase*
