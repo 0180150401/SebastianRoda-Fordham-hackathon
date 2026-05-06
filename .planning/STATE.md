@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-05-06T20:24:40.815Z"
+last_updated: "2026-05-06T22:00:00.000Z"
 progress:
   total_phases: 7
   completed_phases: 1
@@ -15,7 +15,7 @@ progress:
 # State: 6-degrees v2
 
 **Updated:** 2026-05-06  
-**Session:** Phase 1 executed (code) — `/tool` UAT pending (`01-VERIFICATION.md`)
+**Session:** Phase 2 context captured (`02-CONTEXT.md`) — Phase 1 `/tool` UAT still pending (`01-VERIFICATION.md`)
 
 ---
 
@@ -33,10 +33,10 @@ progress:
 |-------|-------|
 | Phase | 2 — Observability, Security & Cost Controls |
 | Plan | — (not started) |
-| Status | Phase 1 complete — run discuss/plan for Phase 2 |
+| Status | Phase 2 discuss complete — ready to plan |
 | Progress | █░░░░░░░░░░░░░ 1 / 7 phases |
 
-**Next action:** `/gsd-discuss-phase 2` or `/gsd-plan-phase 2`
+**Next action:** `/gsd-plan-phase 2`
 
 ---
 
@@ -47,7 +47,7 @@ progress:
 | Phases complete | 1 / 7 |
 | Plans complete | 3 |
 | Requirements mapped | 15 / 15 |
-| Sessions | 2 |
+| Sessions | 3 |
 
 ---
 
@@ -60,6 +60,7 @@ progress:
 - **Phase order mandated by architecture research:** types → observability → extraction → retrieval → synthesis → visualization → polish. Do not skip or reorder.
 - **Optimize for legible graphs + evidence, not raw token volume** — aligns with Core Value; guides trade-off decisions within phases
 - **Phase 1 (discuss):** NDJSON client is **fail-fast** (no silent skip on bad lines); **zod validates every event** in the FSM hook; hook owns parse+FSM only (page keeps `fetch`); **contract test runner = implementer choice** — see `.planning/phases/01-stream-contract-foundation-types/01-CONTEXT.md`
+- **Phase 2 (discuss):** **Langfuse + Supabase** per-run telemetry; **UTC daily cap** with **429 `DAILY_CAP`** (not paywall); **env kill switch**; **`geo-chat` authenticated** like semantic route — see `.planning/phases/02-observability-security-cost-controls/02-CONTEXT.md`
 
 ### Todos
 
@@ -87,9 +88,9 @@ progress:
 
 ## Session Continuity
 
-**To resume:** `.planning/phases/01-stream-contract-foundation-types/01-VERIFICATION.md` then `/gsd-progress`
+**To resume:** `.planning/phases/02-observability-security-cost-controls/02-CONTEXT.md` then `/gsd-plan-phase 2`
 
 ---
 
 *State initialized: 2026-05-06*  
-*Last updated: 2026-05-06 after Phase 1 execution*
+*Last updated: 2026-05-06 after Phase 2 discuss*
