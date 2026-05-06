@@ -1,0 +1,104 @@
+export type NodeCategory = "brand" | "aesthetic" | "query" | "competitor" | "gap";
+
+export type GraphNode = {
+  id: string;
+  label: string;
+  category: NodeCategory;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  size: number;
+  anchorX: number;
+  anchorY: number;
+  fixed?: boolean;
+  gapHint?: string;
+};
+
+export type GraphLink = {
+  id: string;
+  source: string;
+  target: string;
+  weight: number;
+  evidenceIds: string[];
+  dominantCompetitor?: string;
+  missing?: boolean;
+};
+
+export type Evidence = {
+  id: string;
+  query: string;
+  aiResponse: string;
+  sourceTitle: string;
+  sourceUrl: string;
+  coOccurrence: number;
+  timestamp: string;
+};
+
+export type SemanticDiscourseItem = {
+  id: string;
+  phraseTemplate: string;
+  aesthetic: string;
+  intent: string;
+  observedAt: string;
+  modelFamily: string;
+  sentiment: "positive" | "neutral" | "mixed";
+  evidenceIds: string[];
+};
+
+export type VisualCorrelationItem = {
+  id: string;
+  title: string;
+  imageCue: string;
+  visualTags: string[];
+  correlationScore: number;
+  observedWindow: string;
+  gradient: string;
+  evidenceIds: string[];
+  imageUrl?: string;
+  imageUrls?: string[];
+  imageSource?: string;
+  moodboardMode?: boolean;
+};
+
+export type ModelStrengthModel = {
+  model: string;
+  avg: number;
+  count: number;
+  status: "strong" | "emerging" | "weak";
+  evidenceIds: string[];
+};
+
+export type ModelStrengthPayload = {
+  score: number;
+  strong: number;
+  observed: number;
+  models: ModelStrengthModel[];
+};
+
+export type SourceItem = {
+  query: string;
+  title: string;
+  url: string;
+  snippet: string;
+  published?: string;
+  provider: "tavily" | "exa";
+};
+
+export type SemanticUniversePayload = {
+  nodes: GraphNode[];
+  links: GraphLink[];
+  evidence: Evidence[];
+  semanticDiscourse: SemanticDiscourseItem[];
+  visualCorrelations: VisualCorrelationItem[];
+  modelStrength: ModelStrengthPayload;
+};
+
+export const TRACKED_MODELS = [
+  "OpenAI",
+  "Claude",
+  "Gemini",
+  "Perplexity",
+  "Copilot",
+  "Google AI Overview",
+] as const;

@@ -12,6 +12,18 @@ import {
 } from "@/lib/usage/daily-token-budget";
 import { NextResponse } from "next/server";
 import type { PipelineEvent } from "@/lib/pipeline/types";
+import { TRACKED_MODELS } from "@/lib/pipeline/models";
+import type {
+  Evidence,
+  GraphLink,
+  GraphNode,
+  ModelStrengthPayload,
+  NodeCategory,
+  SemanticDiscourseItem,
+  SemanticUniversePayload,
+  SourceItem,
+  VisualCorrelationItem,
+} from "@/lib/pipeline/models";
 
 export const maxDuration = 300;
 
@@ -35,111 +47,6 @@ async function markFreeDemoUsed(userId: string) {
   const { error } = await supabase.from("profiles").update({ free_demo_used_at: iso }).eq("id", userId);
   if (error) console.error("[semantic-universe] mark demo (user)", error);
 }
-
-type NodeCategory = "brand" | "aesthetic" | "query" | "competitor" | "gap";
-
-type GraphNode = {
-  id: string;
-  label: string;
-  category: NodeCategory;
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  size: number;
-  anchorX: number;
-  anchorY: number;
-  fixed?: boolean;
-  gapHint?: string;
-};
-
-type GraphLink = {
-  id: string;
-  source: string;
-  target: string;
-  weight: number;
-  evidenceIds: string[];
-  dominantCompetitor?: string;
-  missing?: boolean;
-};
-
-type Evidence = {
-  id: string;
-  query: string;
-  aiResponse: string;
-  sourceTitle: string;
-  sourceUrl: string;
-  coOccurrence: number;
-  timestamp: string;
-};
-
-type SemanticDiscourseItem = {
-  id: string;
-  phraseTemplate: string;
-  aesthetic: string;
-  intent: string;
-  observedAt: string;
-  modelFamily: string;
-  sentiment: "positive" | "neutral" | "mixed";
-  evidenceIds: string[];
-};
-
-type VisualCorrelationItem = {
-  id: string;
-  title: string;
-  imageCue: string;
-  visualTags: string[];
-  correlationScore: number;
-  observedWindow: string;
-  gradient: string;
-  evidenceIds: string[];
-  imageUrl?: string;
-  imageUrls?: string[];
-  imageSource?: string;
-  moodboardMode?: boolean;
-};
-
-type ModelStrengthModel = {
-  model: string;
-  avg: number;
-  count: number;
-  status: "strong" | "emerging" | "weak";
-  evidenceIds: string[];
-};
-
-type ModelStrengthPayload = {
-  score: number;
-  strong: number;
-  observed: number;
-  models: ModelStrengthModel[];
-};
-
-type SourceItem = {
-  query: string;
-  title: string;
-  url: string;
-  snippet: string;
-  published?: string;
-  provider: "tavily" | "exa";
-};
-
-type SemanticUniversePayload = {
-  nodes: GraphNode[];
-  links: GraphLink[];
-  evidence: Evidence[];
-  semanticDiscourse: SemanticDiscourseItem[];
-  visualCorrelations: VisualCorrelationItem[];
-  modelStrength: ModelStrengthPayload;
-};
-
-const TRACKED_MODELS = [
-  "OpenAI",
-  "Claude",
-  "Gemini",
-  "Perplexity",
-  "Copilot",
-  "Google AI Overview",
-] as const;
 
 function cleanEnvValue(value: string | undefined): string | undefined {
   if (!value) return undefined;
