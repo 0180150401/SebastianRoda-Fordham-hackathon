@@ -5,8 +5,10 @@ import { applyOpenAiUsage } from "@/lib/usage/daily-token-budget";
 import type { PipelineEvent } from "@/lib/pipeline/types";
 import type { SemanticUniversePayload } from "@/lib/pipeline/models";
 import { enrichVisualCorrelationsWithImages } from "@/lib/pipeline/enricher";
+import { getRetrievalLimits, planRetrievalQueries } from "@/lib/pipeline/query-planner";
 import { retrieveSourcesForBrand } from "@/lib/pipeline/retriever";
 import { scoreSourcesForSynthesis } from "@/lib/pipeline/scorer";
+import { filterSourcesForQuality } from "@/lib/pipeline/source-quality";
 import {
   buildFallback,
   extractCompetitorNamesFromSources,
@@ -50,21 +52,39 @@ export async function runSemanticUniverseAnalysisStream({
 }: StreamArgs) {
   try {
     emitLine(controller, { type: "run_meta", run_id: runId });
+    const limits = getRetrievalLimits();
+    const queryPlan = await planRetrievalQueries(brand, { openai, runId, limits });
+    emitLine(controller, queryPlan);
 
     emitLine(controller, { type: "step", id: "sources", status: "running" });
     const tSourcesStart = Date.now();
-    const sources = await retrieveSourcesForBrand(brand, { tavilyKey, exaKey });
-    const rankedSources = await scoreSourcesForSynthesis(sources, brand, {
+    const retrieval = await retrieveSourcesForBrand(brand, { tavilyKey, exaKey, queryPlan, limits });
+    const quality = filterSourcesForQuality(retrieval.sources);
+    const filteredCount = retrieval.sources.length - quality.usableSources.length;
+    const degradedReason =
+      quality.usableSources.length < limits.minimumUsableSources
+        ? "thin_retrieval_evidence"
+        : null;
+    const rankedSources = await scoreSourcesForSynthesis(quality.usableSources, brand, {
       voyageApiKey: voyageKey,
-      timeoutMs: 8000,
+      timeoutMs: limits.providerTimeoutMs,
       topN: 18,
     });
     const duration_ms_sources = Date.now() - tSourcesStart;
+    const sourceDetailParts = [
+      `${retrieval.stats.plannedQueries} planned queries`,
+      `${retrieval.stats.providerSearchesSucceeded} searches succeeded`,
+      `${retrieval.stats.providerSearchesFailed} failed`,
+      `${retrieval.sources.length} candidates`,
+      `${filteredCount} filtered`,
+      `${rankedSources.length} usable`,
+    ];
+    if (degradedReason) sourceDetailParts.push(`degraded: ${degradedReason}`);
     emitLine(controller, {
       type: "step",
       id: "sources",
       status: "done",
-      detail: sources.length + " sources collected, " + rankedSources.length + " reranked for synthesis",
+      detail: sourceDetailParts.join(", "),
     });
 
     emitLine(controller, { type: "step", id: "synthesis", status: "running" });
@@ -112,10 +132,21 @@ export async function runSemanticUniverseAnalysisStream({
       source_count: rankedSources.length,
       result_type,
       langfuse_trace_id: null,
+      retrieval_query_count: retrieval.stats.plannedQueries,
+      retrieval_provider_success_count: retrieval.stats.providerSearchesSucceeded,
+      retrieval_provider_failure_count: retrieval.stats.providerSearchesFailed,
+      retrieval_filtered_count: filteredCount,
+      retrieval_degraded_reason: degradedReason,
+      retrieval_filter_reasons: quality.rejectedCounts,
     });
     if (insErr) console.error("[semantic-universe] telemetry insert", insErr);
 
-    await applyOpenAiUsage(supabase, userId, { input: openaiInput, output: openaiOutput }, 1);
+    await applyOpenAiUsage(
+      supabase,
+      userId,
+      { input: openaiInput, output: openaiOutput },
+      retrieval.stats.providerSearchesPlanned,
+    );
     emitLine(controller, { type: "done", payload: enriched });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected server error.";
