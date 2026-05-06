@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { canUseSemanticTool, isSubscriptionActive } from "@/lib/tool-access";
 import { NextResponse } from "next/server";
+import type { PipelineEvent } from "@/lib/pipeline/types";
 
 function hasDemoCookie(request: Request): boolean {
   const cookie = request.headers.get("cookie") ?? "";
@@ -1576,7 +1577,7 @@ ${context || "No external sources available — generate minimal fallback struct
 
 const encoder = new TextEncoder();
 
-function emitLine(controller: ReadableStreamDefaultController, event: object) {
+function emitLine(controller: ReadableStreamDefaultController, event: PipelineEvent) {
   controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
 }
 
