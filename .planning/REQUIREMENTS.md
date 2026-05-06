@@ -59,27 +59,27 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STREAM-01 | — | Pending |
-| STREAM-02 | — | Pending |
-| OBS-01 | — | Pending |
-| OBS-02 | — | Pending |
-| OBS-03 | — | Pending |
-| PIPE-01 | — | Pending |
-| PIPE-02 | — | Pending |
-| RTRY-01 | — | Pending |
-| RTRY-02 | — | Pending |
-| SYN-01 | — | Pending |
-| SYN-02 | — | Pending |
-| VIS-01 | — | Pending |
-| VIS-02 | — | Pending |
-| VIS-03 | — | Pending |
-| EVID-01 | — | Pending |
+| STREAM-01 | Phase 1 — Stream Contract & Foundation Types | Pending |
+| STREAM-02 | Phase 1 — Stream Contract & Foundation Types | Pending |
+| OBS-01 | Phase 2 — Observability, Security & Cost Controls | Pending |
+| OBS-02 | Phase 2 — Observability, Security & Cost Controls | Pending |
+| OBS-03 | Phase 2 — Observability, Security & Cost Controls | Pending |
+| PIPE-01 | Phase 3 — Pipeline Extraction & Scorer | Pending |
+| PIPE-02 | Phase 3 — Pipeline Extraction & Scorer | Pending |
+| RTRY-01 | Phase 4 — Multi-Stage Retrieval & Query Planner | Pending |
+| RTRY-02 | Phase 4 — Multi-Stage Retrieval & Query Planner | Pending |
+| SYN-01 | Phase 5 — Graph Synthesis Quality & Provenance | Pending |
+| SYN-02 | Phase 5 — Graph Synthesis Quality & Provenance | Pending |
+| VIS-01 | Phase 6 — Graph Visualization Upgrade | Pending |
+| VIS-02 | Phase 6 — Graph Visualization Upgrade | Pending |
+| VIS-03 | Phase 6 — Graph Visualization Upgrade | Pending |
+| EVID-01 | Phase 7 — Evidence Panel & UX Polish | Pending |
 
 **Coverage:**  
 - v1 requirements: 15 total  
-- Mapped to phases: 0 (awaiting roadmap)  
-- Unmapped: 15
+- Mapped to phases: 15  
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-05-06*  
-*Last updated: 2026-05-06 after research synthesis*
+*Last updated: 2026-05-06 after roadmap creation — traceability complete*
