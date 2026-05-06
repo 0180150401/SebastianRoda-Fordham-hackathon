@@ -41,6 +41,46 @@ describe("PipelineEvent contract — variant coverage", () => {
     expect(ev[0]).toEqual({ type: "run_meta", run_id: runId });
     expect(pipelineEventSchema.safeParse(ev[0]).success).toBe(true);
   });
+
+  it("parses query_plan with internal objects and friendly display", () => {
+    const event = {
+      type: "query_plan" as const,
+      plan_id: "plan-test",
+      display: {
+        title: "Retrieval plan",
+        summary: "Looking across competitors, category language, and recent signals.",
+        items: [
+          { id: "q1", label: "Competitive set", intent: "Find peer brands people compare with Acme." },
+          { id: "q2", label: "Recent signals", intent: "Check recent launches and partnerships." },
+        ],
+      },
+      queries: [
+        {
+          id: "q1",
+          label: "Competitive set",
+          intent: "Find peer brands people compare with Acme.",
+          searchPhrase: "Acme competitors shared customer intent",
+          category: "competitors",
+          recency: "none",
+          providers: ["tavily", "exa"],
+          successCriteria: "Results mention Acme and peer brands.",
+        },
+        {
+          id: "q2",
+          label: "Recent signals",
+          intent: "Check recent launches and partnerships.",
+          searchPhrase: "Acme recent launches partnerships market news",
+          category: "recent_signals",
+          recency: "bounded",
+          providers: ["tavily"],
+          successCriteria: "Results include fresh market movement for Acme.",
+        },
+      ],
+    };
+
+    const ev = parseNdjsonEvents([j(event) + "\n"]);
+    expect(ev[0]).toEqual(event);
+  });
 });
 
 describe("Chunk-splitting invariance (STREAM-02)", () => {
@@ -81,6 +121,16 @@ describe("Fail-fast (D-01)", () => {
     expect(() => parseNdjsonEvents([line])).toThrow(NdjsonParseError);
   });
 
+  it("throws on malformed query_plan", () => {
+    const line = j({
+      type: "query_plan",
+      plan_id: "bad",
+      display: { title: "Bad", summary: "Missing items", items: [] },
+      queries: [],
+    }) + "\n";
+    expect(() => parseNdjsonEvents([line])).toThrow(NdjsonParseError);
+  });
+
   it("throws on oversize line", () => {
     const big = `${"a".repeat(MAX_NDJSON_LINE_BYTES + 1)}\n`;
     expect(() => parseNdjsonEvents([big])).toThrow(NdjsonParseError);
@@ -108,6 +158,25 @@ describe("Server-shape parity", () => {
     { type: "step" as const, id: "synthesis" as const, status: "done" as const },
     { type: "step" as const, id: "images" as const, status: "running" as const },
     { type: "step" as const, id: "images" as const, status: "done" as const },
+    {
+      type: "query_plan" as const,
+      plan_id: "server-parity",
+      display: {
+        title: "Retrieval plan",
+        summary: "Friendly retrieval plan display.",
+        items: [{ id: "q1", label: "Competitors", intent: "Find comparable brands." }],
+      },
+      queries: [{
+        id: "q1",
+        label: "Competitors",
+        intent: "Find comparable brands.",
+        searchPhrase: "Acme competitors",
+        category: "competitors",
+        recency: "none",
+        providers: ["tavily", "exa"],
+        successCriteria: "Mentions Acme and comparable brands.",
+      }],
+    },
     { type: "done" as const, payload: {} },
     { type: "error" as const, message: "x" },
   ] as const;

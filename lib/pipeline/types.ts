@@ -31,8 +31,50 @@ const errorEventSchema = z.object({
   message: z.string().min(1).max(4_000),
 });
 
+export const retrievalQueryCategories = [
+  "competitors",
+  "adjacent_categories",
+  "partners_ecosystem",
+  "customer_segments",
+  "claims_positioning",
+  "risks_controversies",
+  "recent_signals",
+  "category_language",
+] as const;
+
+export const retrievalProviders = ["tavily", "exa"] as const;
+
+export const retrievalQueryObjectSchema = z.object({
+  id: z.string().min(1).max(80),
+  label: z.string().min(1).max(120),
+  intent: z.string().min(1).max(400),
+  searchPhrase: z.string().min(1).max(500),
+  category: z.enum(retrievalQueryCategories),
+  recency: z.enum(["none", "bounded"]),
+  providers: z.array(z.enum(retrievalProviders)).min(1).max(2),
+  successCriteria: z.string().min(1).max(500),
+});
+
+export const queryPlanDisplaySchema = z.object({
+  title: z.string().min(1).max(160),
+  summary: z.string().min(1).max(600),
+  items: z.array(z.object({
+    id: z.string().min(1).max(80),
+    label: z.string().min(1).max(120),
+    intent: z.string().min(1).max(300),
+  })).min(1).max(12),
+});
+
+const queryPlanEventSchema = z.object({
+  type: z.literal("query_plan"),
+  plan_id: z.string().min(1).max(120),
+  display: queryPlanDisplaySchema,
+  queries: z.array(retrievalQueryObjectSchema).min(1).max(12),
+});
+
 export const pipelineEventSchema = z.discriminatedUnion("type", [
   runMetaEventSchema,
+  queryPlanEventSchema,
   stepEventSchema,
   doneEventSchema,
   errorEventSchema,
@@ -40,6 +82,9 @@ export const pipelineEventSchema = z.discriminatedUnion("type", [
 
 export type PipelineEvent = z.infer<typeof pipelineEventSchema>;
 export type RunMetaEvent = z.infer<typeof runMetaEventSchema>;
+export type RetrievalQueryObject = z.infer<typeof retrievalQueryObjectSchema>;
+export type QueryPlanDisplay = z.infer<typeof queryPlanDisplaySchema>;
+export type QueryPlanEvent = z.infer<typeof queryPlanEventSchema>;
 export type StepEvent = z.infer<typeof stepEventSchema>;
 export type DoneEvent = z.infer<typeof doneEventSchema>;
 export type ErrorEvent = z.infer<typeof errorEventSchema>;

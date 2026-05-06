@@ -14,7 +14,7 @@ import { ToolAccessGate, useToolAccess } from "@/components/tool/tool-access-gat
 import { cn } from "@/lib/utils";
 import { useSemanticUniverseStream } from "@/hooks/use-semantic-universe-stream";
 import { normalizePayload } from "@/lib/pipeline/normalize-payload";
-import type { StepId } from "@/lib/pipeline/types";
+import type { QueryPlanEvent, StepId } from "@/lib/pipeline/types";
 
 const VIEW_WIDTH = 1180;
 const VIEW_HEIGHT = 760;
@@ -753,6 +753,7 @@ function ToolPageInner() {
   const [modelStrengthSeedData, setModelStrengthSeedData] = useState<ModelStrengthSeed[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [agentTasks, setAgentTasks] = useState<AgentPlanTask[]>(makePipelineTasks());
+  const [queryPlan, setQueryPlan] = useState<QueryPlanEvent | null>(null);
   const [agentTraceOpen, setAgentTraceOpen] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [lastRunAt, setLastRunAt] = useState<string | null>(null);
@@ -876,6 +877,7 @@ function ToolPageInner() {
     setIsLoading(true);
     setLoadError(null);
     setAgentTasks(makePipelineTasks());
+    setQueryPlan(null);
 
     try {
       const response = await fetch("/api/semantic-universe", {
@@ -897,6 +899,9 @@ function ToolPageInner() {
       }
 
       await consume(response.body, {
+        onQueryPlan: (event) => {
+          setQueryPlan(event);
+        },
         onStep: (event) => {
           setAgentTasks((prev) => applyStepEvent(prev, event.id, event.status));
         },
@@ -1110,7 +1115,7 @@ function ToolPageInner() {
               </p>
             ) : null}
             <AnimatePresence>
-              {isLoading ? (
+              {isLoading || queryPlan ? (
                 <motion.div
                   key="agent-plan-shell"
                   layout
@@ -1161,6 +1166,31 @@ function ToolPageInner() {
                         className="overflow-hidden border-t border-border"
                       >
                         <div className="max-h-[min(42vh,400px)] overflow-y-auto">
+                          {queryPlan ? (
+                            <div className="border-b border-border px-4 py-3">
+                              <p className="text-xs font-medium text-foreground">
+                                {queryPlan.display.title}
+                              </p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {queryPlan.display.summary}
+                              </p>
+                              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                {queryPlan.display.items.map((item) => (
+                                  <div
+                                    key={item.id}
+                                    className="rounded-lg border border-border bg-background/70 p-2"
+                                  >
+                                    <p className="text-[0.68rem] font-medium text-foreground">
+                                      {item.label}
+                                    </p>
+                                    <p className="mt-1 text-[0.65rem] leading-relaxed text-muted-foreground">
+                                      {item.intent}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
                           <AgentPlan
                             className="bg-transparent p-0"
                             animateEntrance={false}

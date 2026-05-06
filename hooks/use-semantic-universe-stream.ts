@@ -2,9 +2,10 @@
 
 import { useCallback } from "react";
 import { createNdjsonParser, NdjsonParseError } from "@/lib/pipeline/ndjson";
-import type { DoneEvent, ErrorEvent, PipelineEvent, StepEvent } from "@/lib/pipeline/types";
+import type { DoneEvent, ErrorEvent, PipelineEvent, QueryPlanEvent, StepEvent } from "@/lib/pipeline/types";
 
 export type StreamCallbacks = {
+  onQueryPlan?: (event: QueryPlanEvent) => void;
   onStep?: (event: StepEvent) => void;
   onDone?: (event: DoneEvent) => void;
   onError?: (event: ErrorEvent) => void;
@@ -21,6 +22,8 @@ export function useSemanticUniverseStream() {
       for (const ev of events) {
         if (ev.type === "run_meta") {
           /* correlation-only — UI ignores run_id */
+        } else if (ev.type === "query_plan") {
+          callbacks.onQueryPlan?.(ev);
         } else if (ev.type === "step") callbacks.onStep?.(ev);
         else if (ev.type === "done") callbacks.onDone?.(ev);
         else if (ev.type === "error") callbacks.onError?.(ev);
