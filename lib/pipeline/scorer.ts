@@ -1,5 +1,3 @@
-import { VoyageAIClient } from "voyageai";
-
 import type { SourceItem } from "./models";
 
 const DEFAULT_TOP_N = 18;
@@ -7,7 +5,37 @@ const DEFAULT_TIMEOUT_MS = 8000;
 const VOYAGE_RERANK_MODEL = "rerank-2.5";
 export const RERANK_QUERY_SUFFIX = "semantic brand universe competitive intent";
 
-type VoyageRerankClient = Pick<VoyageAIClient, "rerank">;
+type VoyageRerankResponse = {
+  data?: Array<{ index?: number; relevanceScore?: number }>;
+};
+
+type VoyageRerankClient = {
+  rerank: (
+    request: {
+      query: string;
+      documents: string[];
+      model: string;
+      topK: number;
+      returnDocuments: boolean;
+      truncation: boolean;
+    },
+    requestOptions: {
+      abortSignal?: AbortSignal;
+      timeoutInSeconds: number;
+      maxRetries: number;
+    },
+  ) => Promise<VoyageRerankResponse>;
+};
+
+type VoyageModule = {
+  VoyageAIClient: new (opts: { apiKey: string }) => VoyageRerankClient;
+};
+
+function loadVoyageClient(voyageApiKey: string): VoyageRerankClient {
+  // The SDK's ESM build currently trips Node/Vitest directory import resolution, so load CJS lazily.
+  const { VoyageAIClient } = require("voyageai") as VoyageModule;
+  return new VoyageAIClient({ apiKey: voyageApiKey });
+}
 
 function sourceToDocument(source: SourceItem): string {
   return [
@@ -84,7 +112,7 @@ export async function scoreSourcesForSynthesis(
   }
 
   try {
-    const client = new VoyageAIClient({ apiKey: voyageApiKey });
+    const client = loadVoyageClient(voyageApiKey);
     const rankedSources = await rerankSourcesWithVoyage(sources, brand, client, {
       timeoutMs: opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS,
       topN,
