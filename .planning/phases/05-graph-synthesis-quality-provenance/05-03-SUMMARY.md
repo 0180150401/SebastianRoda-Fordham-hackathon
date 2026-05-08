@@ -56,6 +56,7 @@ completed: 2026-05-08
 ## Task Commits
 
 1. **Task 1-4: Stream, telemetry, contract, and UI status** - `07f8a42` (feat)
+2. **UI status polish: Avoid initial grounded copy before a run** - `04295b0` (fix)
 
 ## Files Created/Modified
 
