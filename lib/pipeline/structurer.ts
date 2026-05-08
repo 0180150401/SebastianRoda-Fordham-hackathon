@@ -1311,9 +1311,6 @@ ${context || "No trusted passage evidence available — generate minimal fallbac
     throw new Error("Model output could not be normalized.");
   }
   const provenance = validateGraphProvenance(normalized);
-  if (provenance.resultType === "fallback") {
-    throw new Error(provenance.reason ?? "below_grounded_graph_floor");
-  }
   return {
     payload: provenance.payload,
     usage: { inputTokens, outputTokens },

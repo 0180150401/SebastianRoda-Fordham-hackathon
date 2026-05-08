@@ -119,16 +119,28 @@ export async function runSemanticUniverseAnalysisStream({
     const tSynthStart = Date.now();
     try {
       const syn = await synthesizeWithOpenAI(brand, rankedSources, openai, verifiedCompetitors);
-      payload = syn.payload;
-      result_type = syn.provenance.resultType;
-      resultReason = syn.provenance.reason ?? null;
-      synthesisRepairedLinks = syn.provenance.repairedLinks;
-      synthesisRejectedLinks = syn.provenance.rejectedLinks;
-      synthesisRejectedNodes = syn.provenance.rejectedNodes;
-      synthesisGroundedEdgeCount = syn.provenance.groundedEdgeCount;
-      synthesisPassageEvidenceCount = syn.provenance.passageEvidenceCount;
       openaiInput = syn.usage.inputTokens;
       openaiOutput = syn.usage.outputTokens;
+      if (syn.provenance.resultType === "fallback") {
+        payload = buildFallback(brand, rankedSources);
+        const counts = provenanceCounts(payload);
+        result_type = "fallback";
+        resultReason = syn.provenance.reason ?? "below_grounded_graph_floor";
+        synthesisRepairedLinks = counts.repairedLinks;
+        synthesisRejectedLinks = counts.rejectedLinks;
+        synthesisRejectedNodes = counts.rejectedNodes;
+        synthesisGroundedEdgeCount = counts.groundedEdgeCount;
+        synthesisPassageEvidenceCount = counts.passageEvidenceCount;
+      } else {
+        payload = syn.payload;
+        result_type = syn.provenance.resultType;
+        resultReason = syn.provenance.reason ?? null;
+        synthesisRepairedLinks = syn.provenance.repairedLinks;
+        synthesisRejectedLinks = syn.provenance.rejectedLinks;
+        synthesisRejectedNodes = syn.provenance.rejectedNodes;
+        synthesisGroundedEdgeCount = syn.provenance.groundedEdgeCount;
+        synthesisPassageEvidenceCount = syn.provenance.passageEvidenceCount;
+      }
     } catch (error) {
       payload = buildFallback(brand, rankedSources);
       const counts = provenanceCounts(payload);
