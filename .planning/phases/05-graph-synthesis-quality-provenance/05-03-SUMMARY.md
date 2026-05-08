@@ -57,6 +57,7 @@ completed: 2026-05-08
 
 1. **Task 1-4: Stream, telemetry, contract, and UI status** - `07f8a42` (feat)
 2. **UI status polish: Avoid initial grounded copy before a run** - `04295b0` (fix)
+3. **Telemetry fallback polish: Preserve OpenAI usage when provenance falls below graph floor** - `1f36f98` (fix)
 
 ## Files Created/Modified
 
@@ -83,9 +84,17 @@ completed: 2026-05-08
 - **Verification:** Re-ran `supabase db push`; it finished successfully.
 - **Committed in:** `07f8a42`
 
+**2. [Rule 2 - Missing Critical] Preserve usage when validator returns fallback**
+- **Found during:** Code review gate
+- **Issue:** A below-floor model graph could be converted to fallback after OpenAI returned, but throwing from `synthesizeWithOpenAI` discarded token usage in telemetry.
+- **Fix:** Return provenance fallback metadata to `stream-handler.ts`, build the fallback payload there, and keep OpenAI usage counts.
+- **Files modified:** `lib/pipeline/structurer.ts`, `lib/pipeline/stream-handler.ts`
+- **Verification:** `npx vitest run lib/pipeline/__tests__/stream-handler.test.ts lib/pipeline/__tests__/structurer.test.ts`; `npx tsc --noEmit`
+- **Committed in:** `1f36f98`
+
 ---
 
-**Total deviations:** 1 auto-fixed (blocking migration drift). **Impact on plan:** Required for the blocking schema push gate; no scope expansion beyond restoring the expected telemetry table contract.
+**Total deviations:** 2 auto-fixed (blocking migration drift, telemetry accuracy). **Impact on plan:** Both fixes preserve planned behavior and improve production reliability without expanding user-facing scope.
 
 ## Issues Encountered
 
