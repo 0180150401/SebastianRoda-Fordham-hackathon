@@ -1,13 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { RequireToolAuth } from "@/components/auth/require-tool-auth";
 import { AccountMenu } from "@/components/tool/account-menu";
 import { InfoHint } from "@/components/tool/info-hint";
 import { ModelStrengthDash } from "@/components/tool/model-strength-dash";
+import { SemanticGraph } from "@/components/tool/semantic-graph";
 import { ToolPaywall } from "@/components/tool/tool-paywall";
 import AgentPlan, { type AgentPlanTask } from "@/components/ui/agent-plan";
 import { ToolAccessGate, useToolAccess } from "@/components/tool/tool-access-gate";
@@ -16,10 +16,6 @@ import { useSemanticUniverseStream } from "@/hooks/use-semantic-universe-stream"
 import { normalizePayload } from "@/lib/pipeline/normalize-payload";
 import type { QueryPlanEvent, StepId } from "@/lib/pipeline/types";
 
-const VIEW_WIDTH = 1180;
-const VIEW_HEIGHT = 760;
-const CENTER_X = VIEW_WIDTH / 2;
-const CENTER_Y = VIEW_HEIGHT / 2;
 const DEMO_STORAGE_KEY = "semantic_demo_used";
 
 type NodeCategory = "brand" | "aesthetic" | "query" | "competitor" | "gap";
@@ -41,6 +37,7 @@ type GraphNode = {
   id: string;
   label: string;
   category: NodeCategory;
+  entityType?: "Person" | "Org" | "Concept" | "Event" | "Claim";
   x: number;
   y: number;
   vx: number;
@@ -63,6 +60,7 @@ type GraphLink = {
   evidenceIds: string[];
   dominantCompetitor?: string;
   missing?: boolean;
+  relType?: "causal" | "associative" | "contextual";
 };
 
 type SemanticDiscourseItem = {
@@ -349,13 +347,13 @@ function buildGraph(brand: string): { nodes: GraphNode[]; links: GraphLink[] } {
       id: "brand-core",
       label: normalizedBrand,
       category: "brand",
-      x: CENTER_X,
-      y: CENTER_Y,
+      x: 590,
+      y: 380,
       vx: 0,
       vy: 0,
       size: 26,
-      anchorX: CENTER_X,
-      anchorY: CENTER_Y,
+      anchorX: 590,
+      anchorY: 380,
       fixed: true,
     },
     {
@@ -606,86 +604,6 @@ function buildGraph(brand: string): { nodes: GraphNode[]; links: GraphLink[] } {
   return { nodes, links };
 }
 
-function nodeColor(category: NodeCategory): string {
-  if (category === "brand") return "#0f766e";
-  if (category === "aesthetic") return "#2563eb";
-  if (category === "query") return "#7c3aed";
-  if (category === "competitor") return "#e11d48";
-  return "#f97316";
-}
-
-function simulateGraph(
-  nodes: GraphNode[],
-  links: GraphLink[],
-  draggedNodeId: string | null,
-): void {
-  const indexById = new Map(nodes.map((node, index) => [node.id, index]));
-
-  for (let i = 0; i < nodes.length; i += 1) {
-    for (let j = i + 1; j < nodes.length; j += 1) {
-      const a = nodes[i];
-      const b = nodes[j];
-      const dx = b.x - a.x;
-      const dy = b.y - a.y;
-      const distanceSq = Math.max(dx * dx + dy * dy, 0.5);
-      const repulsion = 3600 / distanceSq;
-      const distance = Math.sqrt(distanceSq);
-      const nx = dx / distance;
-      const ny = dy / distance;
-      a.vx -= nx * repulsion;
-      a.vy -= ny * repulsion;
-      b.vx += nx * repulsion;
-      b.vy += ny * repulsion;
-    }
-  }
-
-  for (const link of links) {
-    const sourceIndex = indexById.get(link.source);
-    const targetIndex = indexById.get(link.target);
-    if (sourceIndex === undefined || targetIndex === undefined) {
-      continue;
-    }
-    const source = nodes[sourceIndex];
-    const target = nodes[targetIndex];
-    const dx = target.x - source.x;
-    const dy = target.y - source.y;
-    const distance = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-    const restLength = 110 + (1 - link.weight) * 140;
-    const spring = (distance - restLength) * 0.0075;
-    const nx = dx / distance;
-    const ny = dy / distance;
-    source.vx += nx * spring;
-    source.vy += ny * spring;
-    target.vx -= nx * spring;
-    target.vy -= ny * spring;
-  }
-
-  for (const node of nodes) {
-    if (node.fixed) {
-      node.x = CENTER_X;
-      node.y = CENTER_Y;
-      node.vx = 0;
-      node.vy = 0;
-      continue;
-    }
-
-    if (draggedNodeId === node.id) {
-      node.vx = 0;
-      node.vy = 0;
-      continue;
-    }
-
-    node.vx += (node.anchorX - node.x) * 0.003;
-    node.vy += (node.anchorY - node.y) * 0.003;
-    node.vx *= 0.88;
-    node.vy *= 0.88;
-    node.x += node.vx;
-    node.y += node.vy;
-    node.x = Math.min(Math.max(node.x, 80), VIEW_WIDTH - 80);
-    node.y = Math.min(Math.max(node.y, 70), VIEW_HEIGHT - 70);
-  }
-}
-
 function makePipelineTasks(): AgentPlanTask[] {
   return [
     {
@@ -755,6 +673,7 @@ function ToolPageInner() {
   const [brandInput, setBrandInput] = useState("6 degree's");
   const [showGapsOnly, setShowGapsOnly] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string>("brand-core");
+  // selectedLinkId is preserved for the evidence panel; edge-click wiring returns in a future phase.
   const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null);
   const [nodes, setNodes] = useState<GraphNode[]>(INITIAL_GRAPH.nodes);
   const [links, setLinks] = useState<GraphLink[]>(INITIAL_GRAPH.links);
@@ -771,12 +690,6 @@ function ToolPageInner() {
   const [agentTraceOpen, setAgentTraceOpen] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [lastRunAt, setLastRunAt] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState(false);
-  const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
-  const svgRef = useRef<SVGSVGElement | null>(null);
-  const panStartRef = useRef({ x: 0, y: 0 });
   const { consume } = useSemanticUniverseStream();
 
   useEffect(() => {
@@ -795,20 +708,6 @@ function ToolPageInner() {
     if (isLoading) setAgentTraceOpen(true);
   }, [isLoading]);
 
-  useEffect(() => {
-    let rafId = 0;
-    const animate = () => {
-      setNodes((previousNodes) => {
-        const nextNodes = previousNodes.map((node) => ({ ...node }));
-        simulateGraph(nextNodes, links, draggedNodeId);
-        return nextNodes;
-      });
-      rafId = window.requestAnimationFrame(animate);
-    };
-    rafId = window.requestAnimationFrame(animate);
-    return () => window.cancelAnimationFrame(rafId);
-  }, [draggedNodeId, links]);
-
   const nodeMap = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
 
   const applyUniversePayload = (payload: SemanticUniversePayload, nextBrand: string) => {
@@ -822,43 +721,7 @@ function ToolPageInner() {
     setResultStatus(payload.resultType ? { type: payload.resultType, reason: payload.resultReason } : null);
     setSelectedNodeId("brand-core");
     setSelectedLinkId(null);
-    setPan({ x: 0, y: 0 });
-    setZoom(1);
     setLastRunAt(new Date().toISOString());
-  };
-
-  const exportGraphPng = () => {
-    const svg = svgRef.current;
-    if (!svg) return;
-    const serializer = new XMLSerializer();
-    const svgStr = serializer.serializeToString(svg);
-    const svgBlob = new Blob(
-      [`<?xml version="1.0" encoding="utf-8"?>`, svgStr],
-      { type: "image/svg+xml;charset=utf-8" },
-    );
-    const url = URL.createObjectURL(svgBlob);
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      const scale = 2;
-      canvas.width = VIEW_WIDTH * scale;
-      canvas.height = VIEW_HEIGHT * scale;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) { URL.revokeObjectURL(url); return; }
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-      canvas.toBlob((blob) => {
-        if (!blob) return;
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `${brandInput.trim() || "semantic-universe"}-graph.png`;
-        a.click();
-        URL.revokeObjectURL(a.href);
-      }, "image/png");
-    };
-    img.src = url;
   };
 
   const runSemanticAnalysis = async () => {
@@ -1064,20 +927,6 @@ function ToolPageInner() {
     [activeEvidenceIds, visualCorrelationsData],
   );
 
-  const toGraphCoords = (clientX: number, clientY: number) => {
-    const svg = svgRef.current;
-    if (!svg) {
-      return { x: CENTER_X, y: CENTER_Y };
-    }
-    const rect = svg.getBoundingClientRect();
-    const x = ((clientX - rect.left) / rect.width) * VIEW_WIDTH;
-    const y = ((clientY - rect.top) / rect.height) * VIEW_HEIGHT;
-    return {
-      x: (x - pan.x) / zoom,
-      y: (y - pan.y) / zoom,
-    };
-  };
-
   const selectNode = (nodeId: string) => {
     setSelectedLinkId(null);
     setSelectedNodeId(nodeId);
@@ -1260,154 +1109,20 @@ function ToolPageInner() {
             <div className="flex justify-end px-3 pt-2">
               <button
                 type="button"
-                onClick={exportGraphPng}
-                className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
+                disabled
+                title="PNG export returns in Phase 7"
+                className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground opacity-50 cursor-not-allowed"
               >
                 Export PNG
               </button>
             </div>
-            <svg
-              ref={svgRef}
-              viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
-              className="h-[72vh] w-full cursor-grab touch-none"
-              onMouseDown={(event) => {
-                if (event.button !== 0) return;
-                setIsPanning(true);
-                panStartRef.current = {
-                  x: event.clientX - pan.x,
-                  y: event.clientY - pan.y,
-                };
-              }}
-              onMouseMove={(event) => {
-                if (draggedNodeId) {
-                  const point = toGraphCoords(event.clientX, event.clientY);
-                  setNodes((previousNodes) =>
-                    previousNodes.map((node) =>
-                      node.id === draggedNodeId
-                        ? { ...node, x: point.x, y: point.y, vx: 0, vy: 0 }
-                        : node,
-                    ),
-                  );
-                  return;
-                }
-
-                if (!isPanning) return;
-                setPan({
-                  x: event.clientX - panStartRef.current.x,
-                  y: event.clientY - panStartRef.current.y,
-                });
-              }}
-              onMouseUp={() => {
-                setDraggedNodeId(null);
-                setIsPanning(false);
-              }}
-              onMouseLeave={() => {
-                setDraggedNodeId(null);
-                setIsPanning(false);
-              }}
-              onWheel={(event) => {
-                event.preventDefault();
-                const nextZoom = Math.max(0.6, Math.min(1.8, zoom - event.deltaY * 0.001));
-                setZoom(nextZoom);
-              }}
-            >
-              <rect x={0} y={0} width={VIEW_WIDTH} height={VIEW_HEIGHT} fill="transparent" />
-              <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
-                <text x={120} y={120} fill="var(--foreground)" opacity={0.9} fontSize={14}>
-                  Aesthetic cluster
-                </text>
-                <text x={910} y={215} fill="var(--foreground)" opacity={0.9} fontSize={14}>
-                  Competitor gravity
-                </text>
-                <text x={875} y={610} fill="#fb7185" fontSize={14}>
-                  Uncaptured intent
-                </text>
-
-                {visibleLinks.map((link) => {
-                  const source = nodeMap.get(link.source);
-                  const target = nodeMap.get(link.target);
-                  if (!source || !target) return null;
-                  const isSelected = selectedLinkId === link.id;
-                  const opacity = Math.min(0.95, 0.18 + link.weight);
-                  return (
-                    <g
-                      key={link.id}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setSelectedLinkId(link.id);
-                        setSelectedNodeId("");
-                      }}
-                      className="cursor-pointer"
-                    >
-                      <line
-                        x1={source.x}
-                        y1={source.y}
-                        x2={target.x}
-                        y2={target.y}
-                        stroke={link.missing ? "#fb7185" : "#64748b"}
-                        strokeWidth={isSelected ? 4 : 2 + link.weight * 2}
-                        strokeOpacity={isSelected ? 1 : opacity}
-                        strokeDasharray={link.missing ? "7 6" : undefined}
-                      />
-                      {link.dominantCompetitor ? (
-                        <text
-                          x={(source.x + target.x) / 2 + 6}
-                          y={(source.y + target.y) / 2 - 6}
-                          fill="#f43f5e"
-                          fontSize={11}
-                        >
-                          {link.dominantCompetitor} dominates
-                        </text>
-                      ) : null}
-                    </g>
-                  );
-                })}
-
-                {visibleNodes.map((node) => {
-                  const isSelected = selectedNodeId === node.id;
-                  return (
-                    <g
-                      key={node.id}
-                      transform={`translate(${node.x}, ${node.y})`}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        selectNode(node.id);
-                      }}
-                      onMouseDown={(event) => {
-                        event.stopPropagation();
-                        // Select on press so evidence appears on first interaction.
-                        selectNode(node.id);
-                        if (!node.fixed) {
-                          setDraggedNodeId(node.id);
-                        }
-                      }}
-                      className="cursor-pointer"
-                    >
-                      <circle
-                        r={node.size}
-                        fill={nodeColor(node.category)}
-                        opacity={node.category === "gap" ? 0.35 : 0.9}
-                        stroke={isSelected ? "#f8fafc" : "transparent"}
-                        strokeWidth={isSelected ? 3 : 0}
-                      />
-                      <text
-                        y={node.size + 18}
-                        textAnchor="middle"
-                        fill={node.category === "gap" ? "#c2410c" : "var(--foreground)"}
-                        fontSize={13}
-                      >
-                        {node.label}
-                      </text>
-                      {node.gapHint ? (
-                        <text y={node.size + 33} textAnchor="middle" fill="#fb7185" fontSize={11}>
-                          {node.gapHint}
-                        </text>
-                      ) : null}
-                    </g>
-                  );
-                })}
-              </g>
-            </svg>
+            <SemanticGraph
+              nodes={visibleNodes}
+              links={visibleLinks}
+              selectedNodeId={selectedNodeId || null}
+              showGapsOnly={showGapsOnly}
+              onNodeSelect={selectNode}
+            />
           </div>
 
           <ModelStrengthDash

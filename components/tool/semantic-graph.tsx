@@ -3,9 +3,11 @@
 import dynamic from "next/dynamic";
 import type { GraphLink, GraphNode } from "@/lib/pipeline/models";
 
+type SemanticGraphLink = Omit<GraphLink, "sourceIds"> & { sourceIds?: string[] };
+
 export interface SemanticGraphProps {
   nodes: GraphNode[];
-  links: GraphLink[];
+  links: SemanticGraphLink[];
   selectedNodeId: string | null;
   showGapsOnly: boolean;
   onNodeSelect: (nodeId: string) => void;

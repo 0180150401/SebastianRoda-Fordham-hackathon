@@ -12,8 +12,10 @@ import {
 import { useWorkerLayoutForceAtlas2 } from "@react-sigma/layout-forceatlas2";
 import { NodeBorderProgram } from "@sigma/node-border";
 import { useEffect } from "react";
-import type { EntityType, GraphLink, GraphNode } from "@/lib/pipeline/models";
+import type { EntityType, GraphNode } from "@/lib/pipeline/models";
 import type { SemanticGraphProps } from "./semantic-graph";
+
+type SemanticGraphLink = SemanticGraphProps["links"][number];
 
 const ENTITY_TYPE_COLORS: Record<EntityType, string> = {
   Person: "#2563eb",
@@ -58,14 +60,14 @@ function entityFillColor(node: GraphNode): string {
   return ENTITY_TYPE_FALLBACK_COLOR;
 }
 
-function edgeSizeForLink(link: GraphLink): number {
+function edgeSizeForLink(link: SemanticGraphLink): number {
   if (link.missing) return 2;
   if (link.relType === "causal") return 3.5;
   if (link.relType === "associative") return 1.5;
   return 1;
 }
 
-function edgeColorForLink(link: GraphLink): string {
+function edgeColorForLink(link: SemanticGraphLink): string {
   if (link.missing) return "#fb7185";
   if (link.relType === "causal") return "#94a3b8";
   if (link.relType === "associative") return "#64748b";
