@@ -1029,9 +1029,11 @@ function ToolPageInner() {
 
   const weakLinkCount = links.filter((link) => link.missing || link.weight < 0.4).length;
   const resultStatusCopy =
-    resultStatus?.type === "fallback"
+    !resultStatus
+      ? "Demo graph"
+      : resultStatus.type === "fallback"
       ? "Fallback graph: not enough grounded evidence"
-      : resultStatus?.type === "degraded"
+      : resultStatus.type === "degraded"
         ? "Partial graph: unsupported relationships removed"
         : "Grounded synthesis";
   const activeEvidenceIds = useMemo(
