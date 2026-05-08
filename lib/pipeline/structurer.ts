@@ -1280,10 +1280,15 @@ Brand under analysis: "${brand}"
 
 5. COORDINATES: 1180×760 canvas. Brand-core fixed at (590, 380). Spread other nodes across the canvas.
 
+6. ENTITY + RELATION TYPING:
+   - Every node MUST set "entityType" to exactly one of: "Person" (an individual), "Org" (a company, brand, or institution), "Concept" (an abstract idea, aesthetic, or theme), "Event" (a time-bound occurrence such as a launch, season, or news event), "Claim" (an assertion or quoted statement made about ${brand} or competitors).
+   - Every link MUST set "relType" to exactly one of: "causal" (one node directly drives or causes the other), "associative" (the two nodes co-occur or are linked by shared context), "contextual" (the two nodes share a backdrop, time period, or framing without direct causal/associative pull).
+   - Use these classifications consistently. Do not invent new entityType or relType values.
+
 === OUTPUT SCHEMA ===
 {
-  "nodes": [{ "id": string, "label": string, "category": "brand"|"aesthetic"|"query"|"competitor"|"gap", "x": number, "y": number, "vx": 0, "vy": 0, "size": number, "anchorX": number, "anchorY": number, "fixed"?: boolean, "gapHint"?: string, "evidenceIds"?: string[], "sourceIds"?: string[] }],
-  "links": [{ "id": string, "source": string, "target": string, "weight": number (0–1), "sourceIds": string[], "evidenceIds": string[], "dominantCompetitor"?: string, "missing"?: boolean }],
+  "nodes": [{ "id": string, "label": string, "category": "brand"|"aesthetic"|"query"|"competitor"|"gap", "entityType": "Person"|"Org"|"Concept"|"Event"|"Claim", "x": number, "y": number, "vx": 0, "vy": 0, "size": number, "anchorX": number, "anchorY": number, "fixed"?: boolean, "gapHint"?: string, "evidenceIds"?: string[], "sourceIds"?: string[] }],
+  "links": [{ "id": string, "source": string, "target": string, "weight": number (0–1), "relType": "causal"|"associative"|"contextual", "sourceIds": string[], "evidenceIds": string[], "dominantCompetitor"?: string, "missing"?: boolean }],
   "evidence": [{ "id": string, "query": string, "aiResponse": string, "sourceTitle": string, "sourceUrl": string, "sourceId": string, "excerpt": string, "coOccurrence": number (1–100), "timestamp": string (YYYY-MM-DD) }],
   "semanticDiscourse": [{ "id": string, "phraseTemplate": string (use {brand} placeholder), "aesthetic": string, "intent": string, "observedAt": string, "modelFamily": string, "sentiment": "positive"|"neutral"|"mixed", "evidenceIds": string[] }],
   "visualCorrelations": [{ "id": string, "title": string, "imageCue": string, "visualTags": string[], "correlationScore": number (0–1), "observedWindow": string, "gradient": string (valid CSS gradient), "evidenceIds": string[], "colorPalette": string[] }]
