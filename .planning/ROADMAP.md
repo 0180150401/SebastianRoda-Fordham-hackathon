@@ -121,8 +121,11 @@
   2. Communities are automatically detected (Louvain) and color-coded so a user can identify cluster groupings at a glance on medium-to-large graphs
   3. Node shape/color distinguishes ≥5 types (Person, Org, Concept, Event, Claim); edge style distinguishes ≥3 relationship types (causal, associative, contextual)
   4. ForceAtlas2 layout runs off the main thread via web worker — the page remains responsive during layout computation on large graphs
-**Plans**: TBD
-**Research flag**: yes — run Phase 6 research before planning. sigma/react-sigma v5 migration from the current renderer has unknowns; research the migration path and graphology state model integration pattern before planning (actual renderer strategy unclear from codebase mapping)
+**Plans**: 3 plans
+- [ ] 06-01-PLAN.md — Schema additions (entityType, relType) + synthesis prompt update + normalizeModelPayload whitelist
+- [ ] 06-02-PLAN.md — Install sigma/graphology stack + build SemanticGraph component (FA2 worker, Louvain, NodeBorderProgram)
+- [ ] 06-03-PLAN.md — Wire SemanticGraph into /tool, excise SVG/force-sim, manual smoke checkpoint
+**Research flag**: satisfied — `.planning/phases/06-graph-visualization-upgrade/06-RESEARCH.md`
 **UI hint**: yes
 
 ---
@@ -151,7 +154,7 @@
 | 3. Pipeline Extraction & Scorer | 3/3 | Complete | 2026-05-06 |
 | 4. Multi-Stage Retrieval & Query Planner | 4/4 | Complete | 2026-05-06 |
 | 5. Graph Synthesis Quality & Provenance | 3/3 | Complete | 2026-05-08 |
-| 6. Graph Visualization Upgrade | 0/0 | Not started | — |
+| 6. Graph Visualization Upgrade | 0/3 | Not started | — |
 | 7. Evidence Panel & UX Polish | 0/0 | Not started | — |
 
 ---
