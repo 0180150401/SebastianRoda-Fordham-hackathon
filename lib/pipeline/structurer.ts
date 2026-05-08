@@ -1,6 +1,9 @@
 import OpenAI from "openai";
 
 import { TRACKED_MODELS } from "./models";
+import { buildPassageEvidence, formatEvidenceForSynthesis } from "./passage-evidence";
+import { validateGraphProvenance } from "./provenance";
+import type { ProvenanceValidationResult } from "./provenance";
 import type {
   Evidence,
   GraphLink,
@@ -40,20 +43,10 @@ function sourceIdsForEvidence(evidence: Evidence[], evidenceIds: string[]): stri
 export function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePayload {
   const normalizedBrand = brand.trim() || "Your brand";
   const now = new Date().toISOString().slice(0, 10);
-  const evidence = (sources.length > 0 ? sources : []).slice(0, 10).map((source, index) => ({
-    id: `ev-${String(index + 1).padStart(2, "0")}`,
-    sourceId: source.sourceId ?? `src-${String(index + 1).padStart(2, "0")}`,
-    provider: source.provider,
-    query: source.query,
-    aiResponse: source.snippet.slice(0, 260) || "No extracted snippet from source.",
-    excerpt: source.snippet.slice(0, 260) || "No extracted snippet from source.",
-    sourceTitle: source.title,
-    sourceUrl: sanitizeEvidenceUrl(source.url),
-    retrievalScore: source.score,
-    sourceRank: index + 1,
-    coOccurrence: Math.max(20, 72 - index * 4),
-    timestamp: source.published?.slice(0, 10) || now,
-  }));
+  const evidence = buildPassageEvidence(sources.slice(0, 10), {
+    maxPassages: 10,
+    maxExcerptChars: 260,
+  });
 
   const safeEvidence = evidence.length
     ? evidence
@@ -614,6 +607,7 @@ function normalizeModelPayload(
   raw: unknown,
   brand: string,
   sources: SourceItem[],
+  trustedEvidence: Evidence[] = [],
 ): SemanticUniversePayload | null {
   if (!raw || typeof raw !== "object") return null;
   const payload = raw as Record<string, unknown>;
@@ -709,7 +703,15 @@ function normalizeModelPayload(
     })
     .filter((item): item is Evidence => Boolean(item));
 
-  const safeEvidence = evidence.length ? evidence : sourceEvidence;
+  const trustedEvidenceIdSet = new Set(trustedEvidence.map((entry) => entry.id));
+  const matchingModelEvidence = trustedEvidenceIdSet.size > 0
+    ? evidence.filter((entry) => trustedEvidenceIdSet.has(entry.id))
+    : evidence;
+  const safeEvidence = trustedEvidence.length
+    ? trustedEvidence
+    : matchingModelEvidence.length
+      ? matchingModelEvidence
+      : sourceEvidence;
   if (safeEvidence.length === 0) {
     safeEvidence.push({
       id: "ev-1",
@@ -1167,6 +1169,7 @@ function normalizeModelPayload(
       safeEvidence,
       safeEvidence.slice(0, 2).map((entry) => entry.id),
     );
+    link.sourceIds = sourceIdsForEvidence(safeEvidence, link.evidenceIds);
   }
 
   if (nodes.length < 3 || links.length < 2) {
@@ -1230,14 +1233,10 @@ export async function synthesizeWithOpenAI(
 ): Promise<{
   payload: SemanticUniversePayload;
   usage: { inputTokens: number; outputTokens: number };
+  provenance: ProvenanceValidationResult;
 }> {
-  const context = sources
-    .slice(0, 18)
-    .map(
-      (source, index) =>
-        `${index + 1}. [${source.provider}] ${source.title} | ${source.url}\nquery: ${source.query}\nsnippet: ${source.snippet.slice(0, 400)}`,
-    )
-    .join("\n\n");
+  const trustedEvidence = buildPassageEvidence(sources, { maxPassages: 24, maxExcerptChars: 420 });
+  const context = formatEvidenceForSynthesis(trustedEvidence);
 
   const competitorConstraint =
     verifiedCompetitors.length > 0
@@ -1253,8 +1252,10 @@ Brand under analysis: "${brand}"
    Do NOT invent competitor names not in the list above.
    Infer competitor dominance from co-occurrence strength in shared intent spaces where both ${brand} and competitors appear in the source context.
 
-2. EVIDENCE: Every evidence item's aiResponse must paraphrase or quote directly from the source snippets below. Do not invent quotes, stats, or source titles.
-   Evidence should prioritize news-like or publication context where brand + competitor overlap can be assessed.
+2. EVIDENCE: The SOURCE CONTEXT contains trusted passage evidence IDs. Reuse those IDs exactly.
+   Every generated non-brand node must include evidenceIds from the trusted passage list. brand-core is exempt.
+   Every link must include at least one valid evidenceId and sourceIds for the cited source documents.
+   Do not invent evidence IDs, source IDs, quotes, stats, or source titles.
 
 3. NODE LABELS: Use specific, meaningful labels reflecting actual themes in the sources (e.g. "Capsule wardrobe", "Sustainable basics", "Direct competitors") — not generic terms like "cluster" or "market".
 
@@ -1265,9 +1266,9 @@ Brand under analysis: "${brand}"
 
 === OUTPUT SCHEMA ===
 {
-  "nodes": [{ "id": string, "label": string, "category": "brand"|"aesthetic"|"query"|"competitor"|"gap", "x": number, "y": number, "vx": 0, "vy": 0, "size": number, "anchorX": number, "anchorY": number, "fixed"?: boolean, "gapHint"?: string }],
-  "links": [{ "id": string, "source": string, "target": string, "weight": number (0–1), "evidenceIds": string[], "dominantCompetitor"?: string, "missing"?: boolean }],
-  "evidence": [{ "id": string, "query": string, "aiResponse": string, "sourceTitle": string, "sourceUrl": string, "coOccurrence": number (1–100), "timestamp": string (YYYY-MM-DD) }],
+  "nodes": [{ "id": string, "label": string, "category": "brand"|"aesthetic"|"query"|"competitor"|"gap", "x": number, "y": number, "vx": 0, "vy": 0, "size": number, "anchorX": number, "anchorY": number, "fixed"?: boolean, "gapHint"?: string, "evidenceIds"?: string[], "sourceIds"?: string[] }],
+  "links": [{ "id": string, "source": string, "target": string, "weight": number (0–1), "sourceIds": string[], "evidenceIds": string[], "dominantCompetitor"?: string, "missing"?: boolean }],
+  "evidence": [{ "id": string, "query": string, "aiResponse": string, "sourceTitle": string, "sourceUrl": string, "sourceId": string, "excerpt": string, "coOccurrence": number (1–100), "timestamp": string (YYYY-MM-DD) }],
   "semanticDiscourse": [{ "id": string, "phraseTemplate": string (use {brand} placeholder), "aesthetic": string, "intent": string, "observedAt": string, "modelFamily": string, "sentiment": "positive"|"neutral"|"mixed", "evidenceIds": string[] }],
   "visualCorrelations": [{ "id": string, "title": string, "imageCue": string, "visualTags": string[], "correlationScore": number (0–1), "observedWindow": string, "gradient": string (valid CSS gradient), "evidenceIds": string[], "colorPalette": string[] }]
 }
@@ -1284,10 +1285,10 @@ Each visualCorrelation card represents a distinct aesthetic cluster observed in 
 - "colorPalette": 3 hex color values that define this cluster's visual identity (matches the gradient stops).
 - "evidenceIds": Only include IDs of evidence items that actually reference this visual cluster.
 
-Produce: 8–14 nodes, 10–18 links (every link needs at least one evidenceId, include 2–4 missing:true gap links), 8–14 evidence items, 3–5 semanticDiscourse items, 4–5 visualCorrelations.
+Produce: 8–14 nodes, 10–18 links (every link needs at least one evidenceId and sourceIds, include 2–4 missing:true gap links), 8–14 evidence items reusing the trusted IDs, 3–5 semanticDiscourse items, 4–5 visualCorrelations.
 
 === SOURCE CONTEXT ===
-${context || "No external sources available — generate minimal fallback structure only."}
+${context || "No trusted passage evidence available — generate minimal fallback structure only."}
 `;
 
   const completion = await openai.chat.completions.create({
@@ -1305,9 +1306,17 @@ ${context || "No external sources available — generate minimal fallback struct
 
   const content = completion.choices[0]?.message?.content ?? "";
   const parsed = JSON.parse(extractJsonObject(content));
-  const normalized = normalizeModelPayload(parsed, brand, sources);
+  const normalized = normalizeModelPayload(parsed, brand, sources, trustedEvidence);
   if (!normalized) {
     throw new Error("Model output could not be normalized.");
   }
-  return { payload: normalized, usage: { inputTokens, outputTokens } };
+  const provenance = validateGraphProvenance(normalized);
+  if (provenance.resultType === "fallback") {
+    throw new Error(provenance.reason ?? "below_grounded_graph_floor");
+  }
+  return {
+    payload: provenance.payload,
+    usage: { inputTokens, outputTokens },
+    provenance,
+  };
 }
