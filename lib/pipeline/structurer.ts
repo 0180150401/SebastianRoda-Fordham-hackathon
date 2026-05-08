@@ -5,11 +5,13 @@ import { buildPassageEvidence, formatEvidenceForSynthesis } from "./passage-evid
 import { validateGraphProvenance } from "./provenance";
 import type { ProvenanceValidationResult } from "./provenance";
 import type {
+  EntityType,
   Evidence,
   GraphLink,
   GraphNode,
   ModelStrengthPayload,
   NodeCategory,
+  RelType,
   SemanticDiscourseItem,
   SemanticUniversePayload,
   SourceItem,
@@ -603,7 +605,7 @@ function buildModelStrengthPayload(
   return { score, strong, observed: observed.length, models: observed };
 }
 
-function normalizeModelPayload(
+export function normalizeModelPayload(
   raw: unknown,
   brand: string,
   sources: SourceItem[],
@@ -755,10 +757,19 @@ function normalizeModelPayload(
         row.category === "gap"
           ? (row.category as NodeCategory)
           : inferCategory(label, id, brand);
+      const entityType: EntityType | undefined =
+        row.entityType === "Person" ||
+        row.entityType === "Org" ||
+        row.entityType === "Concept" ||
+        row.entityType === "Event" ||
+        row.entityType === "Claim"
+          ? (row.entityType as EntityType)
+          : undefined;
       return {
         id,
         label,
         category,
+        entityType,
         x: typeof row.x === "number" ? row.x : defaultX,
         y: typeof row.y === "number" ? row.y : defaultY,
         vx: typeof row.vx === "number" ? row.vx : 0,
@@ -848,6 +859,10 @@ function normalizeModelPayload(
       const derivedSourceIds = sourceIds.length > 0
         ? sourceIds
         : sourceIdsForEvidence(safeEvidence, evidenceIds);
+      const relType: RelType | undefined =
+        row.relType === "causal" || row.relType === "associative" || row.relType === "contextual"
+          ? (row.relType as RelType)
+          : undefined;
       return {
         id:
           typeof row.id === "string" && row.id.trim().length
@@ -870,6 +885,7 @@ function normalizeModelPayload(
             : typeof row.isGap === "boolean"
               ? row.isGap
               : weight < 0.4,
+        relType,
       } satisfies GraphLink;
     })
     .filter((item): item is GraphLink => item !== null);

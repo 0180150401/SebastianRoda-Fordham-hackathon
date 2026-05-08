@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildFallback, extractJsonObject, synthesizeWithOpenAI } from "../structurer";
+import { buildFallback, extractJsonObject, normalizeModelPayload, synthesizeWithOpenAI } from "../structurer";
 import type { SourceItem } from "../models";
 
 describe("structurer", () => {
@@ -89,5 +89,87 @@ describe("structurer", () => {
     expect(result.provenance.resultType).toBe("success");
     expect(result.payload.evidence.map((entry) => entry.id)).toEqual(["ev-01-01", "ev-01-02", "ev-01-03"]);
     expect(result.payload.links.every((link) => link.sourceIds.includes("src-acme"))).toBe(true);
+  });
+});
+
+describe("normalizeModelPayload entityType/relType whitelist", () => {
+  const baseSources: SourceItem[] = [{
+    query: "q",
+    title: "t",
+    url: "https://example.org",
+    snippet: "snippet",
+    published: "2026-05-01",
+    provider: "tavily",
+  }];
+
+  const buildPayload = (node: Record<string, unknown>, link?: Record<string, unknown>) => ({
+    nodes: [
+      { id: "brand-core", label: "Acme", category: "brand" },
+      { id: "n1", label: "Test", category: "aesthetic", ...node },
+      { id: "n2", label: "Grounded theme", category: "query" },
+    ],
+    links: link
+      ? [
+          {
+            id: "l-type-under-test",
+            source: "brand-core",
+            target: "n1",
+            weight: 0.5,
+            evidenceIds: ["src-1"],
+            sourceIds: ["src-01"],
+            ...link,
+          },
+          {
+            source: "brand-core",
+            target: "n2",
+            weight: 0.55,
+            evidenceIds: ["src-1"],
+            sourceIds: ["src-01"],
+          },
+        ]
+      : [],
+    evidence: [],
+  });
+
+  it.each(["Person", "Org", "Concept", "Event", "Claim"] as const)(
+    "preserves valid entityType %s",
+    (et) => {
+      const out = normalizeModelPayload(buildPayload({ entityType: et }), "Acme", baseSources, []);
+
+      expect(out?.nodes.find((node) => node.id === "n1")?.entityType).toBe(et);
+    },
+  );
+
+  it("drops unknown entityType to undefined (no crash, no leak)", () => {
+    const out = normalizeModelPayload(buildPayload({ entityType: "Hacker" }), "Acme", baseSources, []);
+
+    expect(out?.nodes.find((node) => node.id === "n1")?.entityType).toBeUndefined();
+  });
+
+  it("treats missing entityType as undefined", () => {
+    const out = normalizeModelPayload(buildPayload({}), "Acme", baseSources, []);
+
+    expect(out?.nodes.find((node) => node.id === "n1")?.entityType).toBeUndefined();
+  });
+
+  it.each(["causal", "associative", "contextual"] as const)(
+    "preserves valid relType %s",
+    (rt) => {
+      const out = normalizeModelPayload(buildPayload({}, { relType: rt }), "Acme", baseSources, []);
+
+      expect(out?.links.find((link) => link.id === "l-type-under-test")?.relType).toBe(rt);
+    },
+  );
+
+  it("drops unknown relType to undefined", () => {
+    const out = normalizeModelPayload(buildPayload({}, { relType: "spammy" }), "Acme", baseSources, []);
+
+    expect(out?.links.find((link) => link.id === "l-type-under-test")?.relType).toBeUndefined();
+  });
+
+  it("treats missing relType as undefined", () => {
+    const out = normalizeModelPayload(buildPayload({}, {}), "Acme", baseSources, []);
+
+    expect(out?.links.find((link) => link.id === "l-type-under-test")?.relType).toBeUndefined();
   });
 });
