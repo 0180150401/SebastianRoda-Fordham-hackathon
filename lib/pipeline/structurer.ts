@@ -28,15 +28,29 @@ function sanitizeEvidenceUrl(url: unknown): string {
   }
 }
 
+function sourceIdsForEvidence(evidence: Evidence[], evidenceIds: string[]): string[] {
+  const ids = new Set<string>();
+  for (const evidenceId of evidenceIds) {
+    const sourceId = evidence.find((entry) => entry.id === evidenceId)?.sourceId;
+    if (sourceId) ids.add(sourceId);
+  }
+  return Array.from(ids);
+}
+
 export function buildFallback(brand: string, sources: SourceItem[]): SemanticUniversePayload {
   const normalizedBrand = brand.trim() || "Your brand";
   const now = new Date().toISOString().slice(0, 10);
   const evidence = (sources.length > 0 ? sources : []).slice(0, 10).map((source, index) => ({
     id: `ev-${String(index + 1).padStart(2, "0")}`,
+    sourceId: source.sourceId ?? `src-${String(index + 1).padStart(2, "0")}`,
+    provider: source.provider,
     query: source.query,
     aiResponse: source.snippet.slice(0, 260) || "No extracted snippet from source.",
+    excerpt: source.snippet.slice(0, 260) || "No extracted snippet from source.",
     sourceTitle: source.title,
     sourceUrl: sanitizeEvidenceUrl(source.url),
+    retrievalScore: source.score,
+    sourceRank: index + 1,
     coOccurrence: Math.max(20, 72 - index * 4),
     timestamp: source.published?.slice(0, 10) || now,
   }));
@@ -46,8 +60,11 @@ export function buildFallback(brand: string, sources: SourceItem[]): SemanticUni
     : [
         {
           id: "ev-01",
+          sourceId: "src-01",
           query: `${normalizedBrand} semantic fashion landscape`,
           aiResponse:
+            "Baseline analysis generated due to sparse external results. Configure data connectors for richer evidence density.",
+          excerpt:
             "Baseline analysis generated due to sparse external results. Configure data connectors for richer evidence density.",
           sourceTitle: "Fallback synthesis",
           sourceUrl: "",
@@ -59,6 +76,7 @@ export function buildFallback(brand: string, sources: SourceItem[]): SemanticUni
   const first = safeEvidence[0]?.id;
   const second = safeEvidence[1]?.id ?? first;
   const third = safeEvidence[2]?.id ?? first;
+  const sourceIdsFor = (ids: string[]) => sourceIdsForEvidence(safeEvidence, ids);
 
   const nodes: GraphNode[] = [
     {
@@ -144,6 +162,7 @@ export function buildFallback(brand: string, sources: SourceItem[]): SemanticUni
       target: "minimalist",
       weight: 0.78,
       evidenceIds: [first],
+      sourceIds: sourceIdsFor([first]),
     },
     {
       id: "l-brand-parisian",
@@ -151,6 +170,7 @@ export function buildFallback(brand: string, sources: SourceItem[]): SemanticUni
       target: "parisian",
       weight: 0.7,
       evidenceIds: [second],
+      sourceIds: sourceIdsFor([second]),
     },
     {
       id: "l-brand-quiet",
@@ -158,6 +178,7 @@ export function buildFallback(brand: string, sources: SourceItem[]): SemanticUni
       target: "quiet-luxury",
       weight: 0.45,
       evidenceIds: [third],
+      sourceIds: sourceIdsFor([third]),
       missing: true,
       dominantCompetitor: "Established luxury houses",
     },
@@ -167,6 +188,7 @@ export function buildFallback(brand: string, sources: SourceItem[]): SemanticUni
       target: "streetwear",
       weight: 0.35,
       evidenceIds: [third],
+      sourceIds: sourceIdsFor([third]),
       missing: true,
       dominantCompetitor: "Streetwear incumbents",
     },
@@ -176,6 +198,7 @@ export function buildFallback(brand: string, sources: SourceItem[]): SemanticUni
       target: "gap-discovery",
       weight: 0.24,
       evidenceIds: [third],
+      sourceIds: sourceIdsFor([third]),
       missing: true,
     },
   ];
@@ -595,19 +618,24 @@ function normalizeModelPayload(
   if (!raw || typeof raw !== "object") return null;
   const payload = raw as Record<string, unknown>;
   const now = new Date().toISOString().slice(0, 10);
-  const sourceEvidence = sources.slice(0, 12).map((source, index) => ({
+  const sourceEvidence: Evidence[] = sources.slice(0, 12).map((source, index) => ({
     id: `src-${index + 1}`,
+    sourceId: source.sourceId ?? `src-${String(index + 1).padStart(2, "0")}`,
+    provider: source.provider,
     query: source.query,
     aiResponse: source.snippet.slice(0, 280) || "No extracted snippet.",
+    excerpt: source.snippet.slice(0, 280) || "No extracted snippet.",
     sourceTitle: source.title,
     sourceUrl: sanitizeEvidenceUrl(source.url),
+    retrievalScore: source.score,
+    sourceRank: index + 1,
     coOccurrence: Math.max(20, 68 - index * 3),
     timestamp: source.published?.slice(0, 10) || now,
   }));
 
   const evidenceRaw = Array.isArray(payload.evidence) ? payload.evidence : [];
-  const evidence = evidenceRaw
-    .map((item, index) => {
+  const evidence: Evidence[] = evidenceRaw
+    .map<Evidence | null>((item, index) => {
       if (!item || typeof item !== "object") return null;
       const row = item as Record<string, unknown>;
       const sourceTitle =
@@ -634,6 +662,13 @@ function normalizeModelPayload(
         typeof row.query === "string"
           ? row.query
           : sources[index % Math.max(1, sources.length)]?.query ?? `${brand} semantic signal`;
+      const sourceForIndex = sources[index % Math.max(1, sources.length)];
+      const sourceId =
+        typeof row.sourceId === "string"
+          ? row.sourceId
+          : typeof row.source_id === "string"
+            ? row.source_id
+            : sourceForIndex?.sourceId;
       return {
         id:
           typeof row.id === "string" && row.id.trim().length
@@ -641,8 +676,23 @@ function normalizeModelPayload(
             : `ev-${index + 1}`,
         query,
         aiResponse,
+        excerpt: typeof row.excerpt === "string" ? row.excerpt : aiResponse,
+        sourceId,
+        provider: row.provider === "tavily" || row.provider === "exa" ? row.provider : sourceForIndex?.provider,
         sourceTitle,
         sourceUrl,
+        retrievalScore:
+          typeof row.retrievalScore === "number"
+            ? row.retrievalScore
+            : typeof row.score === "number"
+              ? row.score
+              : sourceForIndex?.score,
+        sourceRank:
+          typeof row.sourceRank === "number"
+            ? row.sourceRank
+            : typeof row.rank === "number"
+              ? row.rank
+              : index + 1,
         coOccurrence:
           typeof row.coOccurrence === "number"
             ? Math.max(1, Math.min(100, row.coOccurrence))
@@ -663,8 +713,10 @@ function normalizeModelPayload(
   if (safeEvidence.length === 0) {
     safeEvidence.push({
       id: "ev-1",
+      sourceId: "src-01",
       query: `${brand} semantic landscape`,
       aiResponse: "Fallback evidence item due to missing sources.",
+      excerpt: "Fallback evidence item due to missing sources.",
       sourceTitle: "Fallback",
       sourceUrl: "",
       coOccurrence: 35,
@@ -672,6 +724,7 @@ function normalizeModelPayload(
     });
   }
   const evidenceIdSet = new Set(safeEvidence.map((entry) => entry.id));
+  const sourceIdSet = new Set(safeEvidence.map((entry) => entry.sourceId).filter((id): id is string => Boolean(id)));
   const firstEvidenceId = safeEvidence[0].id;
 
   const nodeRaw = Array.isArray(payload.nodes) ? payload.nodes : [];
@@ -782,6 +835,17 @@ function normalizeModelPayload(
       const evidenceIds = evidenceIdsRaw
         .filter((id): id is string => typeof id === "string")
         .filter((id) => evidenceIdSet.has(id));
+      const sourceIdsRaw = Array.isArray(row.sourceIds)
+        ? row.sourceIds
+        : Array.isArray(row.source_ids)
+          ? row.source_ids
+          : [];
+      const sourceIds = sourceIdsRaw
+        .filter((id): id is string => typeof id === "string")
+        .filter((id) => sourceIdSet.has(id));
+      const derivedSourceIds = sourceIds.length > 0
+        ? sourceIds
+        : sourceIdsForEvidence(safeEvidence, evidenceIds);
       return {
         id:
           typeof row.id === "string" && row.id.trim().length
@@ -790,6 +854,7 @@ function normalizeModelPayload(
         source,
         target,
         weight,
+        sourceIds: derivedSourceIds,
         evidenceIds,
         dominantCompetitor:
           typeof row.dominantCompetitor === "string"
@@ -1066,6 +1131,10 @@ function normalizeModelPayload(
       target: gapNodeId,
       weight: 0.22,
       evidenceIds: weakestBrandLink?.evidenceIds ?? safeEvidence.slice(0, 1).map((entry) => entry.id),
+      sourceIds: weakestBrandLink?.sourceIds ?? sourceIdsForEvidence(
+        safeEvidence,
+        safeEvidence.slice(0, 1).map((entry) => entry.id),
+      ),
       missing: true,
       dominantCompetitor: specificCompetitors[0]?.label,
     });
@@ -1082,6 +1151,7 @@ function normalizeModelPayload(
         source: gapNodeId,
         target: competitor.id,
         weight: 0.82,
+        sourceIds: sourceIdsForEvidence(safeEvidence, competitorEvidenceIds),
         evidenceIds: competitorEvidenceIds,
         dominantCompetitor: competitor.label,
       });

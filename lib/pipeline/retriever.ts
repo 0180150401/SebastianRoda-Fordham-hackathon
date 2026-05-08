@@ -44,6 +44,24 @@ export function dedupeByUrl(items: SourceItem[]): SourceItem[] {
   return out;
 }
 
+function sourceIdFor(provider: Provider, queryId: string, resultIndex: number): string {
+  return `${provider}-${queryId}-${String(resultIndex + 1).padStart(2, "0")}`;
+}
+
+function compactText(value: string | undefined): string {
+  return (value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function splitTavilyContent(content: string | undefined): string[] {
+  const text = compactText(content);
+  if (!text) return [];
+  const pieces = text
+    .split(/\s*(?:\[\.\.\.\]|\.\.\.|(?:^|\s)-{3,}(?:\s|$))\s*/g)
+    .map(compactText)
+    .filter(Boolean);
+  return pieces.length > 0 ? pieces : [text];
+}
+
 function timeoutSignal(timeoutMs: number): AbortSignal | undefined {
   if (typeof AbortSignal !== "undefined" && "timeout" in AbortSignal) {
     return AbortSignal.timeout(timeoutMs);
@@ -73,6 +91,7 @@ async function fetchTavilyQuery(
     api_key: apiKey,
     query: query.searchPhrase,
     search_depth: "advanced",
+    chunks_per_source: 3,
     include_answer: false,
     max_results: 7,
   };
@@ -91,14 +110,19 @@ async function fetchTavilyQuery(
   const json = (await res.json()) as {
     results?: Array<{ title?: string; url?: string; content?: string; published_date?: string }>;
   };
-  return (json.results ?? []).map((result) => ({
-    query: query.searchPhrase,
-    title: result.title ?? "Untitled result",
-    url: result.url ?? "",
-    snippet: result.content ?? "",
-    published: result.published_date,
-    provider: "tavily" as const,
-  }));
+  return (json.results ?? []).map((result, index) => {
+    const chunks = splitTavilyContent(result.content);
+    return {
+      sourceId: sourceIdFor("tavily", query.id, index),
+      query: query.searchPhrase,
+      title: result.title ?? "Untitled result",
+      url: result.url ?? "",
+      snippet: chunks[0] ?? compactText(result.content),
+      published: result.published_date,
+      provider: "tavily" as const,
+      passages: chunks.map((text) => ({ kind: "chunk" as const, text })),
+    };
+  });
 }
 
 async function fetchExaQuery(
@@ -134,19 +158,30 @@ async function fetchExaQuery(
       publishedDate?: string;
     }>;
   };
-  return (json.results ?? []).map((result) => ({
-    query: query.searchPhrase,
-    title: result.title ?? "Untitled result",
-    url: result.url ?? "",
-    snippet:
-      result.contents?.text ??
-      result.text ??
-      result.contents?.highlights?.join(" ") ??
-      result.highlights?.join(" ") ??
-      "",
-    published: result.publishedDate,
-    provider: "exa" as const,
-  }));
+  return (json.results ?? []).map((result, index) => {
+    const highlights = [
+      ...(result.contents?.highlights ?? []),
+      ...(result.highlights ?? []),
+    ].map(compactText).filter(Boolean);
+    const textPassages = [
+      result.contents?.text,
+      result.text,
+    ].map(compactText).filter(Boolean);
+    const passages = [
+      ...highlights.map((text) => ({ kind: "highlight" as const, text })),
+      ...textPassages.map((text) => ({ kind: "text" as const, text })),
+    ];
+    return {
+      sourceId: sourceIdFor("exa", query.id, index),
+      query: query.searchPhrase,
+      title: result.title ?? "Untitled result",
+      url: result.url ?? "",
+      snippet: passages[0]?.text ?? "",
+      published: result.publishedDate,
+      provider: "exa" as const,
+      passages,
+    };
+  });
 }
 
 async function runProviderQuery(

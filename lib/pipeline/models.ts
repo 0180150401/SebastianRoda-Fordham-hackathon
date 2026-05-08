@@ -13,6 +13,8 @@ export type GraphNode = {
   anchorY: number;
   fixed?: boolean;
   gapHint?: string;
+  sourceIds?: string[];
+  evidenceIds?: string[];
 };
 
 export type GraphLink = {
@@ -20,9 +22,20 @@ export type GraphLink = {
   source: string;
   target: string;
   weight: number;
+  sourceIds: string[];
   evidenceIds: string[];
   dominantCompetitor?: string;
   missing?: boolean;
+};
+
+export type ResultType = "success" | "degraded" | "fallback";
+
+export type SourceProvider = "tavily" | "exa";
+
+export type SourcePassage = {
+  text: string;
+  kind: "highlight" | "text" | "chunk" | "snippet";
+  score?: number;
 };
 
 export type Evidence = {
@@ -31,6 +44,11 @@ export type Evidence = {
   aiResponse: string;
   sourceTitle: string;
   sourceUrl: string;
+  sourceId?: string;
+  provider?: SourceProvider;
+  excerpt?: string;
+  retrievalScore?: number;
+  sourceRank?: number;
   coOccurrence: number;
   timestamp: string;
 };
@@ -77,12 +95,26 @@ export type ModelStrengthPayload = {
 };
 
 export type SourceItem = {
+  sourceId?: string;
   query: string;
   title: string;
   url: string;
   snippet: string;
   published?: string;
-  provider: "tavily" | "exa";
+  provider: SourceProvider;
+  score?: number;
+  passages?: SourcePassage[];
+};
+
+export type SourceDocument = {
+  id: string;
+  query: string;
+  title: string;
+  url: string;
+  provider: SourceProvider;
+  rank: number;
+  score?: number;
+  published?: string;
 };
 
 export type SemanticUniversePayload = {
@@ -92,6 +124,8 @@ export type SemanticUniversePayload = {
   semanticDiscourse: SemanticDiscourseItem[];
   visualCorrelations: VisualCorrelationItem[];
   modelStrength: ModelStrengthPayload;
+  resultType?: ResultType;
+  resultReason?: string;
 };
 
 export const TRACKED_MODELS = [
