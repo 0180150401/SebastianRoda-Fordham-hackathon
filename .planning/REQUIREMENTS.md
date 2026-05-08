@@ -28,8 +28,8 @@
 
 ### Graph synthesis truthfulness & provenance
 
-- [ ] **SYN-01**: Edges carry explicit grounding to sources (for example passage- or URL-level linkage) validated before the graph is shown as authoritative structure.
-- [ ] **SYN-02**: Responses distinguish primary synthesis versus fallback pathways in telemetry and surfaced UX so degraded runs are detectable.
+- [x] **SYN-01**: Edges carry explicit grounding to sources (for example passage- or URL-level linkage) validated before the graph is shown as authoritative structure. *(Implemented 2026-05-08: passage-level evidence IDs, source IDs, grounded synthesis prompt, provenance validator, repair/reject logic, and fallback floor.)*
+- [x] **SYN-02**: Responses distinguish primary synthesis versus fallback pathways in telemetry and surfaced UX so degraded runs are detectable. *(Implemented 2026-05-08: `resultType`/`resultReason` stream payload, compact `/tool` status, and Supabase provenance telemetry.)*
 
 ### Visualization & comprehension
 
@@ -68,8 +68,8 @@
 | PIPE-02 | Phase 3 — Pipeline Extraction & Scorer | Done |
 | RTRY-01 | Phase 4 — Multi-Stage Retrieval & Query Planner | Done |
 | RTRY-02 | Phase 4 — Multi-Stage Retrieval & Query Planner | Done |
-| SYN-01 | Phase 5 — Graph Synthesis Quality & Provenance | Pending |
-| SYN-02 | Phase 5 — Graph Synthesis Quality & Provenance | Pending |
+| SYN-01 | Phase 5 — Graph Synthesis Quality & Provenance | Done |
+| SYN-02 | Phase 5 — Graph Synthesis Quality & Provenance | Done |
 | VIS-01 | Phase 6 — Graph Visualization Upgrade | Pending |
 | VIS-02 | Phase 6 — Graph Visualization Upgrade | Pending |
 | VIS-03 | Phase 6 — Graph Visualization Upgrade | Pending |
@@ -82,4 +82,4 @@
 
 ---
 *Requirements defined: 2026-05-06*  
-*Last updated: 2026-05-06 — PIPE-01/02 marked done after Phase 3 verification*
+*Last updated: 2026-05-08 — SYN-01/02 marked done after Phase 5 verification*

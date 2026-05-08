@@ -13,7 +13,7 @@
 - [x] **Phase 2: Observability, Security & Cost Controls** — Langfuse instrumentation, per-run telemetry, cost guards, and auth hardening before pipeline expansion (completed 2026-05-06)
 - [x] **Phase 3: Pipeline Extraction & Scorer** — Decompose 1 600-line monolith into `lib/pipeline/` stage modules; add voyageai reranker (completed 2026-05-06)
 - [x] **Phase 4: Multi-Stage Retrieval & Query Planner** — LLM-driven query decomposition, multi-subquery fan-out, retrieval plan visible in stream (completed 2026-05-06)
-- [ ] **Phase 5: Graph Synthesis Quality & Provenance** — Grounded edges with `source_ids[]`, passage-level evidence arrays, fallback visibility
+- [x] **Phase 5: Graph Synthesis Quality & Provenance** — Grounded edges with `source_ids[]`, passage-level evidence arrays, fallback visibility (completed 2026-05-08)
 - [ ] **Phase 6: Graph Visualization Upgrade** — sigma/graphology WebGL renderer; Louvain clusters; node/edge type encoding; ForceAtlas2 layout
 - [ ] **Phase 7: Evidence Panel & UX Polish** — Evidence panel with ranked excerpts per node; legible stream progress; partial graph skeleton on `graph_ready`
 
@@ -104,9 +104,9 @@
   3. A user can distinguish a primary synthesis run from a fallback run via a visible `result_type` indicator in the stream and UI
   4. Each node carries an `evidence[]` array with passage excerpts and retrieval scores that downstream UI components can consume directly
 **Plans**:
-- [ ] `05-01-PLAN.md` — Source/passage data model, provider-native passage preservation, deterministic passage evidence extraction
-- [ ] `05-02-PLAN.md` — Passage-grounded synthesis prompt, post-synthesis provenance validator, repair/reject/fallback floor
-- [ ] `05-03-PLAN.md` — Result type stream/telemetry contract, Supabase migration, compact `/tool` status indicator
+- [x] `05-01-PLAN.md` — Source/passage data model, provider-native passage preservation, deterministic passage evidence extraction
+- [x] `05-02-PLAN.md` — Passage-grounded synthesis prompt, post-synthesis provenance validator, repair/reject/fallback floor
+- [x] `05-03-PLAN.md` — Result type stream/telemetry contract, Supabase migration, compact `/tool` status indicator
 **Research flag**: satisfied — `.planning/phases/05-graph-synthesis-quality-provenance/05-RESEARCH.md`
 **UI hint**: no
 
@@ -122,7 +122,7 @@
   3. Node shape/color distinguishes ≥5 types (Person, Org, Concept, Event, Claim); edge style distinguishes ≥3 relationship types (causal, associative, contextual)
   4. ForceAtlas2 layout runs off the main thread via web worker — the page remains responsive during layout computation on large graphs
 **Plans**: TBD
-**Research flag**: yes — `/gsd-research-phase` required. sigma/react-sigma v5 migration from the current renderer has unknowns; research the migration path and graphology state model integration pattern before planning (actual renderer strategy unclear from codebase mapping)
+**Research flag**: yes — run Phase 6 research before planning. sigma/react-sigma v5 migration from the current renderer has unknowns; research the migration path and graphology state model integration pattern before planning (actual renderer strategy unclear from codebase mapping)
 **UI hint**: yes
 
 ---
@@ -150,7 +150,7 @@
 | 2. Observability, Security & Cost Controls | 3/3 | Complete    | 2026-05-06 |
 | 3. Pipeline Extraction & Scorer | 3/3 | Complete | 2026-05-06 |
 | 4. Multi-Stage Retrieval & Query Planner | 4/4 | Complete | 2026-05-06 |
-| 5. Graph Synthesis Quality & Provenance | 0/3 | Planned | 05-01, 05-02, 05-03 |
+| 5. Graph Synthesis Quality & Provenance | 3/3 | Complete | 2026-05-08 |
 | 6. Graph Visualization Upgrade | 0/0 | Not started | — |
 | 7. Evidence Panel & UX Polish | 0/0 | Not started | — |
 
@@ -181,4 +181,4 @@
 ---
 
 *Roadmap created: 2026-05-06*  
-*Last updated: 2026-05-06 after Phase 4 execution*
+*Last updated: 2026-05-08 after Phase 5 execution*

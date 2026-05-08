@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-last_updated: "2026-05-08T06:00:00.000Z"
+status: Ready to discuss
+last_updated: "2026-05-08T06:15:00.000Z"
 progress:
   total_phases: 7
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 16
-  completed_plans: 13
-  percent: 81
+  completed_plans: 16
+  percent: 100
 ---
 
 # State: 6-degrees v2
 
 **Updated:** 2026-05-08
-**Session:** Phase 5 planned — ready for execution
+**Session:** Phase 5 complete — ready for Phase 6
 
 ---
 
@@ -23,7 +23,7 @@ progress:
 
 **Core Value:** Users get a trustworthy, explorable graph of entities and relationships grounded in fresh web evidence, with clear provenance and legible model reasoning.
 
-**Current Focus:** Phase 5 — Graph Synthesis Quality & Provenance
+**Current Focus:** Phase 6 — Graph Visualization Upgrade
 
 ---
 
@@ -31,12 +31,12 @@ progress:
 
 | Field | Value |
 |-------|-------|
-| Phase | 5 — Graph Synthesis Quality & Provenance |
-| Plan | 3 plans created |
-| Status | Phase 5 ready for execution |
-| Progress | ████████░░░░░░ 4 / 7 phases |
+| Phase | 6 — Graph Visualization Upgrade |
+| Plan | Not started |
+| Status | Phase 6 ready for discussion and research |
+| Progress | ██████████░░░░ 5 / 7 phases |
 
-**Next action:** `/gsd-execute-phase 5`
+**Next action:** `/gsd-discuss-phase 6`
 
 ---
 
@@ -44,9 +44,9 @@ progress:
 
 | Metric | Value |
 |--------|-------|
-| Phases complete | 4 / 7 |
+| Phases complete | 5 / 7 |
 | Plans authored | 16 (including 3 for Phase 5) |
-| Plans executed | 13 (through Phase 4) |
+| Plans executed | 16 (through Phase 5) |
 | Requirements mapped | 15 / 15 |
 | Sessions | — |
 
@@ -64,6 +64,7 @@ progress:
 - **Phase 2 (discuss):** **Langfuse + Supabase** per-run telemetry; **UTC daily cap** with **429 `DAILY_CAP`** (not paywall); **env kill switch**; **`geo-chat` authenticated** like semantic route — see `.planning/phases/02-observability-security-cost-controls/02-CONTEXT.md`
 - **Phase 3 (complete):** `app/api/semantic-universe/route.ts` decomposed into `lib/pipeline/*`; **Voyage `rerank-2.5`** runs before synthesis with timeout + no-key fallback; **POST verified at 40 lines** — see `.planning/phases/03-pipeline-extraction-scorer/03-VERIFICATION.md`
 - **Phase 4 (complete):** `query_plan` stream contract, structured planner, planned Tavily/Exa fanout, source-quality filtering, degraded retrieval detail, and additive telemetry are implemented and verified — see `.planning/phases/04-multi-stage-retrieval-query-planner/04-VERIFICATION.md`
+- **Phase 5 (complete):** passage-level evidence extraction, source/evidence ID grounding, provenance validation, degraded/fallback result metadata, compact `/tool` synthesis status, and Supabase telemetry migration are implemented and verified — see `.planning/phases/05-graph-synthesis-quality-provenance/05-VERIFICATION.md`
 
 ### Todos
 
@@ -76,29 +77,27 @@ progress:
 ### Warnings
 
 - **Phase 4 UI smoke:** Manual `/tool` smoke with live credentials is recommended to confirm the trace panel copy in-browser.
+- **Phase 5 UI smoke:** Manual `/tool` smoke with live credentials is recommended to confirm the compact synthesis status and graph behavior in-browser.
 
 ### Research Flags (surface at plan time)
 
 - **Phase 4:** Satisfied — `.planning/phases/04-multi-stage-retrieval-query-planner/04-RESEARCH.md`
 - **Phase 5:** Satisfied — `.planning/phases/05-graph-synthesis-quality-provenance/05-RESEARCH.md`
-- **Phase 6:** Needs `/gsd-research-phase` — sigma/react-sigma v5 migration path from current renderer
+- **Phase 6:** Needs research before planning — sigma/react-sigma v5 migration path from current renderer
 
 ### Known Gaps to Validate During Planning
 
 - **Phase 3 review warning:** Add SSRF protections around image enrichment source URL fetches.
 - **Phase 3 review warning:** Add per-request Tavily/Exa timeouts so one stalled upstream request cannot hang the sources step. Covered by Phase 4 Plan 04-03.
-- **Supabase `pipeline_runs` schema:** Review before Phase 2 planning to confirm no conflict with existing `profiles` and access-control tables
-- **OpenAI structured output + large graph schemas:** Flag for Phase 5 planning; add `max_tokens` guard and streaming JSON validation empirically
-- **LLM prompt design for query planner:** Quality is highly prompt-dependent; allocate explicit iteration time during Phase 4 before treating planner as stable
 - **Current renderer strategy:** SVG/Canvas/D3 usage is unclear from codebase mapping; confirm during Phase 6 research to calibrate migration effort
 
 ---
 
 ## Session Continuity
 
-**To resume:** `/gsd-execute-phase 5`
+**To resume:** `/gsd-discuss-phase 6`
 
 ---
 
 *State initialized: 2026-05-06*  
-*Last updated: 2026-05-08 after Phase 5 planning*
+*Last updated: 2026-05-08 after Phase 5 execution*
