@@ -33,6 +33,8 @@ type GraphNode = {
   anchorY: number;
   fixed?: boolean;
   gapHint?: string;
+  sourceIds?: string[];
+  evidenceIds?: string[];
 };
 
 type GraphLink = {
@@ -40,6 +42,7 @@ type GraphLink = {
   source: string;
   target: string;
   weight: number;
+  sourceIds?: string[];
   evidenceIds: string[];
   dominantCompetitor?: string;
   missing?: boolean;
@@ -84,6 +87,8 @@ export type SemanticUniversePayload = {
   semanticDiscourse: SemanticDiscourseItem[];
   visualCorrelations: VisualCorrelationItem[];
   modelStrength: ModelStrengthSeed[];
+  resultType?: "success" | "degraded" | "fallback";
+  resultReason?: string;
 };
 
 
@@ -94,6 +99,8 @@ type LoosePayload = Partial<{
   semanticDiscourse: unknown;
   visualCorrelations: unknown;
   modelStrength: unknown;
+  resultType: unknown;
+  resultReason: unknown;
 }>;
 
 const EVIDENCE: Evidence[] = [
@@ -707,5 +714,12 @@ export function normalizePayload(payload: unknown): SemanticUniversePayload {
     semanticDiscourse: semanticDiscourse.length ? semanticDiscourse : SEMANTIC_DISCOURSE,
     visualCorrelations: visualCorrelations.length ? visualCorrelations : VISUAL_CORRELATIONS,
     modelStrength,
+    resultType:
+      payloadLoose.resultType === "success" ||
+      payloadLoose.resultType === "degraded" ||
+      payloadLoose.resultType === "fallback"
+        ? payloadLoose.resultType
+        : undefined,
+    resultReason: typeof payloadLoose.resultReason === "string" ? payloadLoose.resultReason : undefined,
   };
 }

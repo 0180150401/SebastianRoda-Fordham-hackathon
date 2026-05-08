@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { applyOpenAiUsage } from "@/lib/usage/daily-token-budget";
 import type { PipelineEvent } from "@/lib/pipeline/types";
-import type { SemanticUniversePayload } from "@/lib/pipeline/models";
+import type { ResultType, SemanticUniversePayload } from "@/lib/pipeline/models";
 import { enrichVisualCorrelationsWithImages } from "@/lib/pipeline/enricher";
 import { getRetrievalLimits, planRetrievalQueries } from "@/lib/pipeline/query-planner";
 import { retrieveSourcesForBrand } from "@/lib/pipeline/retriever";
@@ -34,6 +34,23 @@ type StreamArgs = {
 
 export function emitLine(controller: ReadableStreamDefaultController, event: PipelineEvent) {
   controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
+}
+
+function fallbackReason(error: unknown): string {
+  if (error instanceof Error && error.message === "below_grounded_graph_floor") {
+    return "below_grounded_graph_floor";
+  }
+  return "fallback_synthesis";
+}
+
+function provenanceCounts(payload: SemanticUniversePayload) {
+  return {
+    repairedLinks: 0,
+    rejectedLinks: 0,
+    rejectedNodes: 0,
+    groundedEdgeCount: payload.links.filter((link) => link.evidenceIds.length > 0).length,
+    passageEvidenceCount: payload.evidence.length,
+  };
 }
 
 export async function runSemanticUniverseAnalysisStream({
@@ -90,21 +107,45 @@ export async function runSemanticUniverseAnalysisStream({
     emitLine(controller, { type: "step", id: "synthesis", status: "running" });
     const verifiedCompetitors = extractCompetitorNamesFromSources(brand, rankedSources);
     let payload: SemanticUniversePayload;
-    let result_type: "success" | "fallback" = "success";
+    let result_type: ResultType = "success";
+    let resultReason: string | null = null;
+    let synthesisRepairedLinks = 0;
+    let synthesisRejectedLinks = 0;
+    let synthesisRejectedNodes = 0;
+    let synthesisGroundedEdgeCount = 0;
+    let synthesisPassageEvidenceCount = 0;
     let openaiInput = 0;
     let openaiOutput = 0;
     const tSynthStart = Date.now();
     try {
       const syn = await synthesizeWithOpenAI(brand, rankedSources, openai, verifiedCompetitors);
       payload = syn.payload;
+      result_type = syn.provenance.resultType;
+      resultReason = syn.provenance.reason ?? null;
+      synthesisRepairedLinks = syn.provenance.repairedLinks;
+      synthesisRejectedLinks = syn.provenance.rejectedLinks;
+      synthesisRejectedNodes = syn.provenance.rejectedNodes;
+      synthesisGroundedEdgeCount = syn.provenance.groundedEdgeCount;
+      synthesisPassageEvidenceCount = syn.provenance.passageEvidenceCount;
       openaiInput = syn.usage.inputTokens;
       openaiOutput = syn.usage.outputTokens;
-    } catch {
+    } catch (error) {
       payload = buildFallback(brand, rankedSources);
+      const counts = provenanceCounts(payload);
       result_type = "fallback";
+      resultReason = fallbackReason(error);
+      synthesisRepairedLinks = counts.repairedLinks;
+      synthesisRejectedLinks = counts.rejectedLinks;
+      synthesisRejectedNodes = counts.rejectedNodes;
+      synthesisGroundedEdgeCount = counts.groundedEdgeCount;
+      synthesisPassageEvidenceCount = counts.passageEvidenceCount;
     }
+    payload = { ...payload, resultType: result_type, resultReason: resultReason ?? undefined };
     const duration_ms_synthesis = Date.now() - tSynthStart;
-    emitLine(controller, { type: "step", id: "synthesis", status: "done" });
+    const synthesisDetail = resultReason
+      ? `result: ${result_type} (${resultReason})`
+      : `result: ${result_type}`;
+    emitLine(controller, { type: "step", id: "synthesis", status: "done", detail: synthesisDetail });
 
     emitLine(controller, { type: "step", id: "images", status: "running" });
     const tImgStart = Date.now();
@@ -138,6 +179,12 @@ export async function runSemanticUniverseAnalysisStream({
       retrieval_filtered_count: filteredCount,
       retrieval_degraded_reason: degradedReason,
       retrieval_filter_reasons: quality.rejectedCounts,
+      synthesis_result_reason: resultReason,
+      synthesis_repaired_links: synthesisRepairedLinks,
+      synthesis_rejected_links: synthesisRejectedLinks,
+      synthesis_rejected_nodes: synthesisRejectedNodes,
+      synthesis_grounded_edge_count: synthesisGroundedEdgeCount,
+      synthesis_passage_evidence_count: synthesisPassageEvidenceCount,
     });
     if (insErr) console.error("[semantic-universe] telemetry insert", insErr);
 

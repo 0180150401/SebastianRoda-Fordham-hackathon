@@ -30,6 +30,20 @@ describe("PipelineEvent contract — variant coverage", () => {
     }
   });
 
+  it("parses done with synthesis result metadata", () => {
+    const payload = {
+      resultType: "degraded",
+      resultReason: "unsupported_relationships_removed",
+      nodes: [],
+      links: [],
+    };
+    const ev = parseNdjsonEvents([j({ type: "done", payload }) + "\n"]);
+    expect(ev[0]?.type).toBe("done");
+    if (ev[0]?.type === "done") {
+      expect(ev[0].payload).toEqual(payload);
+    }
+  });
+
   it("parses error", () => {
     const ev = parseNdjsonEvents([j({ type: "error", message: "boom" }) + "\n"]);
     expect(ev[0]).toEqual({ type: "error", message: "boom" });

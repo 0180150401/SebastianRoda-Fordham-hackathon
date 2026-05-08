@@ -125,7 +125,13 @@ async function runAndCollect() {
   });
 
   return {
-    events: chunks.join("").trim().split("\n").map((line) => JSON.parse(line) as { type: string; id?: string; status?: string; detail?: string }),
+    events: chunks.join("").trim().split("\n").map((line) => JSON.parse(line) as {
+      type: string;
+      id?: string;
+      status?: string;
+      detail?: string;
+      payload?: SemanticUniversePayload;
+    }),
     insert,
   };
 }
@@ -148,8 +154,17 @@ describe("runSemanticUniverseAnalysisStream Phase 4 orchestration", () => {
     synthesizeWithOpenAIMock.mockResolvedValue({
       payload,
       usage: { inputTokens: 11, outputTokens: 22 },
+      provenance: {
+        payload,
+        resultType: "success",
+        rejectedLinks: 0,
+        rejectedNodes: 0,
+        repairedLinks: 0,
+        groundedEdgeCount: 0,
+        passageEvidenceCount: 0,
+      },
     });
-    enrichVisualCorrelationsWithImagesMock.mockResolvedValue(payload);
+    enrichVisualCorrelationsWithImagesMock.mockImplementation(async (nextPayload: SemanticUniversePayload) => nextPayload);
     applyOpenAiUsageMock.mockResolvedValue(undefined);
   });
 
@@ -175,7 +190,9 @@ describe("runSemanticUniverseAnalysisStream Phase 4 orchestration", () => {
       retrieval_provider_failure_count: 0,
       retrieval_filtered_count: 0,
       retrieval_degraded_reason: null,
+      synthesis_result_reason: null,
     }));
+    expect(events.at(-1)?.payload?.resultType).toBe("success");
     expect(applyOpenAiUsageMock).toHaveBeenCalledWith(
       expect.anything(),
       "user-1",
@@ -220,6 +237,51 @@ describe("runSemanticUniverseAnalysisStream Phase 4 orchestration", () => {
     expect(insert).toHaveBeenCalledWith(expect.objectContaining({
       retrieval_filtered_count: 1,
       retrieval_degraded_reason: "thin_retrieval_evidence",
+    }));
+  });
+
+  it("carries degraded synthesis result through stream detail, payload, and telemetry", async () => {
+    synthesizeWithOpenAIMock.mockResolvedValueOnce({
+      payload,
+      usage: { inputTokens: 33, outputTokens: 44 },
+      provenance: {
+        payload,
+        resultType: "degraded",
+        reason: "unsupported_relationships_removed",
+        rejectedLinks: 2,
+        rejectedNodes: 1,
+        repairedLinks: 0,
+        groundedEdgeCount: 3,
+        passageEvidenceCount: 4,
+      },
+    });
+
+    const { events, insert } = await runAndCollect();
+    expect(events.find((event) => event.id === "synthesis" && event.status === "done")?.detail)
+      .toContain("result: degraded (unsupported_relationships_removed)");
+    expect(events.at(-1)?.payload?.resultType).toBe("degraded");
+    expect(events.at(-1)?.payload?.resultReason).toBe("unsupported_relationships_removed");
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      result_type: "degraded",
+      synthesis_result_reason: "unsupported_relationships_removed",
+      synthesis_rejected_links: 2,
+      synthesis_rejected_nodes: 1,
+      synthesis_grounded_edge_count: 3,
+      synthesis_passage_evidence_count: 4,
+    }));
+  });
+
+  it("falls back visibly when synthesis cannot produce a grounded graph", async () => {
+    synthesizeWithOpenAIMock.mockRejectedValueOnce(new Error("below_grounded_graph_floor"));
+
+    const { events, insert } = await runAndCollect();
+    expect(events.find((event) => event.id === "synthesis" && event.status === "done")?.detail)
+      .toContain("result: fallback (below_grounded_graph_floor)");
+    expect(events.at(-1)?.payload?.resultType).toBe("fallback");
+    expect(events.at(-1)?.payload?.resultReason).toBe("below_grounded_graph_floor");
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      result_type: "fallback",
+      synthesis_result_reason: "below_grounded_graph_floor",
     }));
   });
 });

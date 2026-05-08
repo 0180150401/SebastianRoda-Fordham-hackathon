@@ -30,6 +30,9 @@ type Evidence = {
   aiResponse: string;
   sourceTitle: string;
   sourceUrl: string;
+  sourceId?: string;
+  excerpt?: string;
+  retrievalScore?: number;
   coOccurrence: number;
   timestamp: string;
 };
@@ -47,6 +50,8 @@ type GraphNode = {
   anchorY: number;
   fixed?: boolean;
   gapHint?: string;
+  sourceIds?: string[];
+  evidenceIds?: string[];
 };
 
 type GraphLink = {
@@ -54,6 +59,7 @@ type GraphLink = {
   source: string;
   target: string;
   weight: number;
+  sourceIds?: string[];
   evidenceIds: string[];
   dominantCompetitor?: string;
   missing?: boolean;
@@ -98,6 +104,13 @@ type SemanticUniversePayload = {
   semanticDiscourse: SemanticDiscourseItem[];
   visualCorrelations: VisualCorrelationItem[];
   modelStrength: ModelStrengthSeed[];
+  resultType?: "success" | "degraded" | "fallback";
+  resultReason?: string;
+};
+
+type ResultStatus = {
+  type: "success" | "degraded" | "fallback";
+  reason?: string;
 };
 
 type ToolAccessPayload = {
@@ -754,6 +767,7 @@ function ToolPageInner() {
   const [isLoading, setIsLoading] = useState(false);
   const [agentTasks, setAgentTasks] = useState<AgentPlanTask[]>(makePipelineTasks());
   const [queryPlan, setQueryPlan] = useState<QueryPlanEvent | null>(null);
+  const [resultStatus, setResultStatus] = useState<ResultStatus | null>(null);
   const [agentTraceOpen, setAgentTraceOpen] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [lastRunAt, setLastRunAt] = useState<string | null>(null);
@@ -805,6 +819,7 @@ function ToolPageInner() {
     setSemanticDiscourseData(payload.semanticDiscourse);
     setVisualCorrelationsData(payload.visualCorrelations);
     setModelStrengthSeedData(payload.modelStrength);
+    setResultStatus(payload.resultType ? { type: payload.resultType, reason: payload.resultReason } : null);
     setSelectedNodeId("brand-core");
     setSelectedLinkId(null);
     setPan({ x: 0, y: 0 });
@@ -878,6 +893,7 @@ function ToolPageInner() {
     setLoadError(null);
     setAgentTasks(makePipelineTasks());
     setQueryPlan(null);
+    setResultStatus(null);
 
     try {
       const response = await fetch("/api/semantic-universe", {
@@ -1012,6 +1028,12 @@ function ToolPageInner() {
   }, [evidenceData, links, selectedLink, selectedNode]);
 
   const weakLinkCount = links.filter((link) => link.missing || link.weight < 0.4).length;
+  const resultStatusCopy =
+    resultStatus?.type === "fallback"
+      ? "Fallback graph: not enough grounded evidence"
+      : resultStatus?.type === "degraded"
+        ? "Partial graph: unsupported relationships removed"
+        : "Grounded synthesis";
   const activeEvidenceIds = useMemo(
     () => new Set(activeEvidence.map((entry) => entry.id)),
     [activeEvidence],
@@ -1206,6 +1228,13 @@ function ToolPageInner() {
           </div>
 
           <div className="mb-4 grid gap-3 text-sm sm:grid-cols-2">
+            <div className="rounded-lg border border-border bg-surface-inset p-3">
+              <p className="text-foreground">Synthesis status</p>
+              <p className="mt-1 text-sm font-semibold">{resultStatusCopy}</p>
+              {resultStatus?.reason ? (
+                <p className="mt-1 text-xs text-muted-foreground">{resultStatus.reason}</p>
+              ) : null}
+            </div>
             <div className="rounded-lg border border-border bg-surface-inset p-3">
               <p className="text-foreground">Weak or missing edges</p>
               <p className="mt-1 text-lg font-semibold">{weakLinkCount}</p>
