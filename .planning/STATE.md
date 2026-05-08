@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to research
-last_updated: "2026-05-08T05:08:31.218Z"
+status: Ready to plan
+last_updated: "2026-05-08T05:12:41.300Z"
 progress:
   total_phases: 7
   completed_phases: 4
@@ -15,7 +15,7 @@ progress:
 # State: 6-degrees v2
 
 **Updated:** 2026-05-08
-**Session:** Phase 5 context gathered — ready for required research
+**Session:** Phase 5 research complete — ready for planning
 
 ---
 
@@ -32,11 +32,11 @@ progress:
 | Field | Value |
 |-------|-------|
 | Phase | 5 — Graph Synthesis Quality & Provenance |
-| Plan | Context gathered |
-| Status | Phase 5 ready for research before planning |
+| Plan | Research complete |
+| Status | Phase 5 ready for detailed planning |
 | Progress | ████████░░░░░░ 4 / 7 phases |
 
-**Next action:** `/gsd-research-phase 5`
+**Next action:** `/gsd-plan-phase 5`
 
 ---
 
@@ -80,7 +80,7 @@ progress:
 ### Research Flags (surface at plan time)
 
 - **Phase 4:** Satisfied — `.planning/phases/04-multi-stage-retrieval-query-planner/04-RESEARCH.md`
-- **Phase 5:** Needs `/gsd-research-phase` — Passage extraction approach and source/passage provenance schema design
+- **Phase 5:** Satisfied — `.planning/phases/05-graph-synthesis-quality-provenance/05-RESEARCH.md`
 - **Phase 6:** Needs `/gsd-research-phase` — sigma/react-sigma v5 migration path from current renderer
 
 ### Known Gaps to Validate During Planning
@@ -96,9 +96,9 @@ progress:
 
 ## Session Continuity
 
-**To resume:** `/gsd-research-phase 5`
+**To resume:** `/gsd-plan-phase 5`
 
 ---
 
 *State initialized: 2026-05-06*  
-*Last updated: 2026-05-08 after Phase 5 context session*
+*Last updated: 2026-05-08 after Phase 5 research*
