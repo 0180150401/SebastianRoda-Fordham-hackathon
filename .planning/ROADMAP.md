@@ -103,8 +103,11 @@
   2. A post-synthesis validation pass flags or rejects edges referencing zero sources; no unsupported relationships are shown to users as authoritative structure
   3. A user can distinguish a primary synthesis run from a fallback run via a visible `result_type` indicator in the stream and UI
   4. Each node carries an `evidence[]` array with passage excerpts and retrieval scores that downstream UI components can consume directly
-**Plans**: TBD
-**Research flag**: yes — `/gsd-research-phase` required. Passage extraction approach (Exa highlights vs Tavily snippets vs custom chunking) and provenance schema design have multiple viable patterns; research before committing to the `evidence[]` schema and `zodResponseFormat` structure
+**Plans**:
+- [ ] `05-01-PLAN.md` — Source/passage data model, provider-native passage preservation, deterministic passage evidence extraction
+- [ ] `05-02-PLAN.md` — Passage-grounded synthesis prompt, post-synthesis provenance validator, repair/reject/fallback floor
+- [ ] `05-03-PLAN.md` — Result type stream/telemetry contract, Supabase migration, compact `/tool` status indicator
+**Research flag**: satisfied — `.planning/phases/05-graph-synthesis-quality-provenance/05-RESEARCH.md`
 **UI hint**: no
 
 ---
@@ -147,7 +150,7 @@
 | 2. Observability, Security & Cost Controls | 3/3 | Complete    | 2026-05-06 |
 | 3. Pipeline Extraction & Scorer | 3/3 | Complete | 2026-05-06 |
 | 4. Multi-Stage Retrieval & Query Planner | 4/4 | Complete | 2026-05-06 |
-| 5. Graph Synthesis Quality & Provenance | 0/0 | Not started | — |
+| 5. Graph Synthesis Quality & Provenance | 0/3 | Planned | 05-01, 05-02, 05-03 |
 | 6. Graph Visualization Upgrade | 0/0 | Not started | — |
 | 7. Evidence Panel & UX Polish | 0/0 | Not started | — |
 
