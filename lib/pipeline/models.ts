@@ -1,9 +1,12 @@
 export type NodeCategory = "brand" | "aesthetic" | "query" | "competitor" | "gap";
+export type EntityType = "Person" | "Org" | "Concept" | "Event" | "Claim";
+export type RelType = "causal" | "associative" | "contextual";
 
 export type GraphNode = {
   id: string;
   label: string;
   category: NodeCategory;
+  entityType?: EntityType;
   x: number;
   y: number;
   vx: number;
@@ -26,6 +29,7 @@ export type GraphLink = {
   evidenceIds: string[];
   dominantCompetitor?: string;
   missing?: boolean;
+  relType?: RelType;
 };
 
 export type ResultType = "success" | "degraded" | "fallback";
