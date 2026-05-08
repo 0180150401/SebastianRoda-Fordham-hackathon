@@ -1,10 +1,11 @@
 ---
 phase: 6
 slug: graph-visualization-upgrade
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-05-08
+reviewed_at: 2026-05-08
 ---
 
 # Phase 6 — UI Design Contract
@@ -45,7 +46,7 @@ Declared values (multiples of 4 only):
 | 3xl   | 64px  | Page-level spacing                 |
 
 Exceptions:
-- Graph container toolbar buttons use `px-3 py-1.5` (12px / 6px) — existing pattern from the Export PNG button; retained as-is.
+- Graph container toolbar buttons use `px-4 py-2` (16px / 8px) — aligned to the 8-point grid; replaces the previous `px-3 py-1.5` pattern.
 - Sigma container occupies `h-[72vh] w-full` — fixed by D-09; not a spacing token.
 
 **Source:** Existing `app/tool/page.tsx` class patterns (`p-5`, `px-4 py-3`, `p-3`, `gap-1.5`, `gap-3`); 8-point base confirmed.
@@ -57,9 +58,12 @@ Exceptions:
 | Role     | Size | Weight          | Line Height | Usage                                              |
 |----------|------|-----------------|-------------|----------------------------------------------------|
 | Body     | 14px | 400 (regular)   | 1.5         | Sidebar labels, evidence text, toggle copy         |
-| Label    | 12px | 500 (medium)    | 1.4         | Toolbar button labels, chip labels, badge text     |
+| Label    | 12px | 600 (semibold)  | 1.4         | Toolbar button labels, chip labels, badge text     |
 | Heading  | 16px | 600 (semibold)  | 1.3         | Section headings in sidebar, panel titles          |
-| Display  | 20px | 600 (semibold)  | 1.2         | Not used in Phase 6 scope (no new headings added)  |
+
+**2-weight system:** regular (400) for Body and sigma node labels; semibold (600) for Heading and Label.
+
+**Display (20px):** inherited from the global design system — not instantiated in Phase 6 scope (no new top-level headings added in this phase).
 
 Sigma node labels:
 - Size: 13px (matching existing SVG `fontSize={13}`)
