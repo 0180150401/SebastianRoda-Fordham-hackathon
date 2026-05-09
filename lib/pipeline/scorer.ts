@@ -6,7 +6,7 @@ const VOYAGE_RERANK_MODEL = "rerank-2.5";
 export const RERANK_QUERY_SUFFIX = "semantic brand universe competitive intent";
 
 type VoyageRerankResponse = {
-  data?: Array<{ index?: number; relevanceScore?: number }>;
+  data?: Array<{ index?: number; relevanceScore?: number; relevance_score?: number }>;
 };
 
 type VoyageRerankClient = {
@@ -27,14 +27,34 @@ type VoyageRerankClient = {
   ) => Promise<VoyageRerankResponse>;
 };
 
-type VoyageModule = {
-  VoyageAIClient: new (opts: { apiKey: string }) => VoyageRerankClient;
-};
+function createVoyageRestClient(voyageApiKey: string): VoyageRerankClient {
+  return {
+    rerank: async (request, requestOptions) => {
+      const response = await fetch("https://api.voyageai.com/v1/rerank", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${voyageApiKey}`,
+          "content-type": "application/json",
+        },
+        signal: requestOptions.abortSignal,
+        body: JSON.stringify({
+          query: request.query,
+          documents: request.documents,
+          model: request.model,
+          top_k: request.topK,
+          return_documents: request.returnDocuments,
+          truncation: request.truncation,
+        }),
+      });
 
-function loadVoyageClient(voyageApiKey: string): VoyageRerankClient {
-  // The SDK's ESM build currently trips Node/Vitest directory import resolution, so load CJS lazily.
-  const { VoyageAIClient } = require("voyageai") as VoyageModule;
-  return new VoyageAIClient({ apiKey: voyageApiKey });
+      if (!response.ok) {
+        const detail = await response.text().catch(() => "");
+        throw new Error(`Voyage rerank failed (${response.status}): ${detail.slice(0, 200)}`);
+      }
+
+      return (await response.json()) as VoyageRerankResponse;
+    },
+  };
 }
 
 function sourceToDocument(source: SourceItem): string {
@@ -89,10 +109,13 @@ export async function rerankSourcesWithVoyage(
   );
 
   return (response.data ?? [])
-    .filter((item): item is { index: number; relevanceScore?: number } => typeof item.index === "number")
+    .filter(
+      (item): item is { index: number; relevanceScore?: number; relevance_score?: number } =>
+        typeof item.index === "number",
+    )
     .sort(
       (a, b) =>
-        (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0) ||
+        (b.relevanceScore ?? b.relevance_score ?? 0) - (a.relevanceScore ?? a.relevance_score ?? 0) ||
         a.index - b.index,
     )
     .map((item) => sources[item.index])
@@ -112,7 +135,7 @@ export async function scoreSourcesForSynthesis(
   }
 
   try {
-    const client = loadVoyageClient(voyageApiKey);
+    const client = createVoyageRestClient(voyageApiKey);
     const rankedSources = await rerankSourcesWithVoyage(sources, brand, client, {
       timeoutMs: opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS,
       topN,
