@@ -614,23 +614,26 @@ function edgeColorForLink(link: { relType?: string; missing?: boolean }): string
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **CSS import path for @react-sigma/core v5.0.6**
    - What we know: Official docs reference `'@react-sigma/core/lib/react-sigma.min.css'` in some places and `'@react-sigma/core/lib/style.css'` in others.
    - What's unclear: Which exact path is correct for v5.0.6.
    - Recommendation: After `npm install`, run `ls node_modules/@react-sigma/core/lib/` to confirm the actual filename before writing the import.
+   - **RESOLVED:** Plan 02 Task 1 explicitly lists the CSS file under `node_modules/@react-sigma/core/lib/` after `npm install` and records the actual filename. Plan 02 Task 2 imports `@react-sigma/core/lib/style.css` by default with explicit instruction to substitute `react-sigma.min.css` if `style.css` is not present. Verification step `ls node_modules/@react-sigma/core/lib/ | grep -E "\.(css)$"` is part of Task 1's automated check.
 
 2. **ForceAtlas2 worker in Next.js 16 Turbopack — potential worker blob URL issue**
    - What we know: Next.js 16.2 fixed a Turbopack bug where Web Workers bootstrapped via `blob://` URLs had `location.origin = ''`, causing relative fetches to fail. graphology-layout-forceatlas2 uses an internal worker.
    - What's unclear: Whether `graphology-layout-forceatlas2/worker` (used internally by `useWorkerLayoutForceAtlas2`) is affected by this in Next.js 16.1.6 (pre-16.2 fix). The version in this project is 16.1.6.
    - Recommendation: Test FA2 worker in dev mode immediately after install. If worker fails silently (layout doesn't run), fall back to synchronous FA2 with `forceatlas2.assign(graph, { iterations: 200 })` for Phase 6 — layout quality is slightly worse but acceptable for a fallback. Log `[semantic-graph] FA2 worker running: ${layout.isRunning()}` to detect silent failure.
    - **Risk level:** MEDIUM — Next.js 16.1.6 predates the Turbopack blob URL fix in 16.2.
+   - **RESOLVED:** Plan 02 Task 2 wires `useWorkerLayoutForceAtlas2` per Pattern 3 with required cleanup (`clearTimeout(timer); stop(); kill();`) per Pitfall 5, and uses the `[semantic-graph]` console.error logging convention so any silent worker failure is observable. Plan 03's manual smoke test verifies layout actually runs in dev; if the Turbopack blob URL bug surfaces, the fallback to synchronous `forceatlas2.assign(graph, { iterations: 200 })` is documented here and remains available without re-research.
 
 3. **Dashed edge for `contextual` relType and `missing` flag**
    - What we know: sigma v3 has no native dashed edge support. Color + opacity differentiation is the recommended Phase 6 approach.
    - What's unclear: Whether the product stakeholder considers color+opacity sufficient for "distinguishes ≥3 relationship types" per VIS-02, or whether dashed is required for acceptance.
    - Recommendation: Color+size encoding meets "visually distinct" per the requirement text. If dashed is required, scope a custom GLSL EdgeProgram to Phase 7 alongside the PNG export and drag work.
+   - **RESOLVED:** Plan 02 Task 2 hard-codes the size + color edge encoding from UI-SPEC (causal=3.5px `#94a3b8`, associative=1.5px `#64748b`, contextual=1px `rgba(100,116,139,0.35)`, missing=2px `#fb7185`) — three visually distinct relType styles satisfying VIS-02. A custom dashed GLSL EdgeProgram remains explicitly scoped to Phase 7 per D-07's "or equivalent" allowance and the deferred-ideas list.
 
 ---
 
